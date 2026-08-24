@@ -21,8 +21,8 @@ class UdpSender {
   void configure(UdpConfig cfg);  // BU: Replace host/port/enabled and drop the old socket so the next send rebinds.
   UdpConfig config() const;       // BU: Locked copy of the current UDP settings.
 
-  void set_encoder(std::unique_ptr<PacketEncoder> encoder);  // BU: Swap in a different on-wire format.
-  bool send(const std::vector<Entity>& entities, double sim_time_s);  // BU: Encode and sendto(); false if disabled or I/O fails.
+  void set_encoder(std::unique_ptr<PacketEncoder> encoder);  // BU: ICD swap point — pass a DSS encoder instead of PlaceholderEncoder.
+  bool send(const std::vector<Entity>& entities, double sim_time_s);  // BU: One datagram per call (whole air picture). Split here if DSS is per-track.
 
  private:
   mutable std::mutex mu_;                       // BU: Guards cfg_, encoder_, and sock_.

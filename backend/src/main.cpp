@@ -125,12 +125,12 @@ int main(int argc, char** argv) {
 
   double sim_time = 0.0;                                                       // BU: Last sim_time seen while playing (used for UDP).
   engine.set_state_callback([&](const nlohmann::json& state) {                 // BU: Called every engine push (tick or heartbeat).
-    ws.broadcast(state.dump());                                                // BU: Fan the JSON snapshot out to all WS clients.
-    if (state.value("playing", false)) {                                       // BU: Only emit UDP while the sim is running.
+    ws.broadcast(state.dump());                                                // BU: Fan the JSON snapshot out to all WS clients (UI only; not DSS).
+    if (state.value("playing", false)) {                                       // BU: UDP only while PLAYING. DSS heartbeat-while-paused → drop this guard.
       sim_time = state.value("sim_time", sim_time);                            // BU: Latch the clock carried in the snapshot.
       auto sc = engine.copy_scenario();                                        // BU: Copy entities + udp.enabled under the engine lock.
       if (sc.udp.enabled) {                                                    // BU: Respect the scenario/UI enable flag.
-        udp.send(sc.entities, sim_time);                                       // BU: Encode IWP2 and sendto the configured host:port.
+        udp.send(sc.entities, sim_time);                                       // BU: ICD: encoder_ packs Entity[] ; change send() if DSS wants one packet per track.
       }
     }
   });

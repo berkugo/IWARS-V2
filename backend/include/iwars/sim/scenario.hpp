@@ -18,10 +18,10 @@ struct ScenarioMeta {
   int zoom{10};                       // BU: Default Leaflet zoom level.
 };
 
-// BU: Outbound UDP truth-feed destination and on/off switch.
+// BU: Outbound UDP truth-feed destination and on/off switch (DSS listener address).
 struct UdpConfig {
-  std::string host{"127.0.0.1"};  // BU: IPv4 address of the workplace radar/IFF listener.
-  int port{9000};                 // BU: UDP destination port.
+  std::string host{"127.0.0.1"};  // BU: IPv4 address of the workplace radar/IFF / DSS listener.
+  int port{9000};                 // BU: UDP destination port (change if DSS listens elsewhere).
   bool enabled{false};            // BU: When false, the engine still ticks but sends no datagrams.
 };
 

@@ -10,6 +10,7 @@
 namespace iwars {
 
 // BU: Default to the placeholder IWP2 encoder; socket is opened lazily on first send.
+// BU: ICD swap: replace PlaceholderEncoder with the DSS encoder class here (or call set_encoder from main).
 UdpSender::UdpSender() : encoder_(std::make_unique<PlaceholderEncoder>()) {}
 
 // BU: Release the datagram socket if configure()/send() opened one.
@@ -50,7 +51,7 @@ bool UdpSender::send(const std::vector<Entity>& entities, double sim_time_s) {
   if (!encoder_) return false;                 // BU: No format installed.
   if (!ensure_socket()) return false;          // BU: Could not open a UDP socket.
 
-  const auto payload = encoder_->encode(entities, sim_time_s);  // BU: Build the IWP2 (or future) datagram.
+  const auto payload = encoder_->encode(entities, sim_time_s);  // BU: ICD lives in encode(); send() only ships the bytes.
 
   sockaddr_in addr{};                          // BU: IPv4 destination filled below.
   addr.sin_family = AF_INET;                   // BU: IPv4.

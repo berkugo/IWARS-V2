@@ -13,6 +13,9 @@ import L from 'leaflet'
 import { isOwnship } from '../radarTypes'
 import { buildOwnshipIconSvg, buildTrackIconSvg } from '../trackIcons'
 
+// Offline: never fetch Leaflet's default PNG markers (would 404 on air-gap).
+delete L.Icon.Default.prototype._getIconUrl
+
 const AFF_COLOR = {
   friend: '#3d9eff',
   blue: '#3d9eff',

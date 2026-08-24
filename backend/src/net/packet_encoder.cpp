@@ -40,6 +40,8 @@ void append_str(std::vector<std::uint8_t>& out, const std::string& s) {
 
 std::vector<std::uint8_t> PlaceholderEncoder::encode(
     const std::vector<Entity>& entities, double sim_time_s) const {
+  // BU: IWP2 placeholder only. When the DSS ICD is known, reimplement encode()
+  // BU: (or a new PacketEncoder subclass) using Entity fields listed in packet_encoder.hpp.
   std::vector<std::uint8_t> out;                         // BU: Datagram we will sendto().
   out.reserve(64 + entities.size() * 160);               // BU: Avoid reallocs for a typical air picture.
   out.push_back('I');                                    // BU: Magic[0] — IWP2 identifier.

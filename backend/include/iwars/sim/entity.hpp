@@ -17,8 +17,9 @@ struct Waypoint {
   double lon{0};  // BU: Waypoint longitude in decimal degrees.
 };
 
-/** Truth target for radar/IFF stimulators.
- *  Downstream radar sim turns these into radar blips + IFF replies.
+/** Truth target for radar/IFF stimulators (DSS).
+ *  These fields are the source for UDP encode(). Add members here only if
+ *  the DSS ICD needs data IWARS does not already store (then JSON + UI too).
  */
 // BU: One air track's identity, pose, kinematics, IFF, and optional route.
 struct Entity {
@@ -39,10 +40,10 @@ struct Entity {
   double speed_mps{0};     // BU: Ground speed in meters per second.
   double climb_mps{0};     // BU: Vertical rate in meters per second (positive = climb).
 
-  // IFF / SIF (air C4ISR)
+  // IFF / SIF — stim truth for DSS; map onto DSS IFF PDUs in PacketEncoder::encode.
   bool iff_enabled{true};          // BU: Whether this track answers IFF interrogations.
   std::string iff_mode{"3A"};      // BU: Active IFF mode: off | 1 | 2 | 3A | C | S | 4 | 5.
-  std::string squawk{"1200"};      // BU: Mode 3/A octal code stored as a string.
+  std::string squawk{"1200"};      // BU: Mode 3/A octal code stored as a 4-char string, not a packed int.
   bool mode_c{true};               // BU: Report altitude via Mode C when interrogated.
   bool mode_4{false};              // BU: Crypto friend-reply stim flag.
   bool mode_5{false};              // BU: Mode 5 stim flag.
