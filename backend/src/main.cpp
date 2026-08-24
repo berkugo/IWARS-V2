@@ -46,6 +46,30 @@ std::filesystem::path resolve_scenarios_dir(int argc, char** argv) {
   return fallback;                                         // BU: Return the newly created (or existing) fallback.
 }
 
+// BU: Find the Vite production build (frontend/dist) so HTTP can serve the UI with no Node.
+std::filesystem::path resolve_web_root(int argc, char** argv) {
+  if (const char* env = std::getenv("IWARS_WEBROOT")) {    // BU: Explicit override wins.
+    return env;
+  }
+  std::filesystem::path exe =
+      argc > 0 ? std::filesystem::absolute(argv[0]).parent_path()
+               : std::filesystem::current_path();
+  const std::filesystem::path candidates[] = {
+      std::filesystem::current_path() / "frontend" / "dist",
+      exe / "frontend" / "dist",
+      exe / ".." / "frontend" / "dist",
+      exe / ".." / ".." / "frontend" / "dist",
+      exe / "dist",
+  };
+  for (const auto& c : candidates) {
+    std::error_code ec;
+    if (std::filesystem::exists(c / "index.html", ec)) {
+      return std::filesystem::weakly_canonical(c);
+    }
+  }
+  return {};                                               // BU: Empty — API-only mode (Vite still works in dev).
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -60,7 +84,13 @@ int main(int argc, char** argv) {
                                    : 8081;
 
   const auto scenarios_dir = resolve_scenarios_dir(argc, argv);  // BU: Resolve where JSON scenarios live.
+  const auto web_root = resolve_web_root(argc, argv);            // BU: Bundled UI, if present.
   std::cout << "[main] scenarios dir: " << scenarios_dir << "\n";  // BU: Log the chosen directory.
+  if (!web_root.empty()) {
+    std::cout << "[main] UI dir: " << web_root << "\n";
+  } else {
+    std::cout << "[main] UI dir: (none — open Vite :5173 or set IWARS_WEBROOT)\n";
+  }
 
   iwars::Engine engine(10.0);  // BU: 10 Hz truth tick (100 ms period).
   iwars::UdpSender udp;        // BU: UDP sender with the placeholder IWP2 encoder.
@@ -89,7 +119,8 @@ int main(int argc, char** argv) {
   }
 
   iwars::WsServer ws(ws_port);                                                 // BU: Live JSON feed for the React UI.
-  iwars::HttpServer http(engine, udp, scenarios_dir.string(), http_port);      // BU: REST API over the engine and UDP sender.
+  iwars::HttpServer http(engine, udp, scenarios_dir.string(), web_root.string(),
+                         http_port, ws_port);                                  // BU: REST + optional static UI.
   http.set_ws(&ws);                                                            // BU: Give HTTP a pointer to WS (engine callback does the actual broadcast).
 
   double sim_time = 0.0;                                                       // BU: Last sim_time seen while playing (used for UDP).
@@ -109,7 +140,8 @@ int main(int argc, char** argv) {
   engine.start();  // BU: Start the 10 Hz worker (paused until /control/play).
 
   std::cout << "[main] IWARS scenario tool ready\n"       // BU: Tell the operator where to connect.
-            << "  HTTP  http://127.0.0.1:" << http_port << "\n"
+            << "  UI    http://127.0.0.1:" << http_port << "/\n"
+            << "  HTTP  http://127.0.0.1:" << http_port << "/api\n"
             << "  WS    ws://127.0.0.1:" << ws_port << "\n";
 
   while (g_run.load()) {                                   // BU: Idle the main thread until a stop signal.

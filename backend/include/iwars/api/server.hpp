@@ -18,7 +18,7 @@ class WsServer;  // BU: Forward declare so HttpServer can hold a pointer without
 class HttpServer {
  public:
   HttpServer(Engine& engine, UdpSender& udp, std::string scenarios_dir,
-             int port = 8080);  // BU: Bind engine, UDP sender, scenario folder, and listen port.
+             std::string web_root, int port = 8080, int ws_port = 8081);
   ~HttpServer();                // BU: Stop the listen thread on destruction.
 
   void start();                 // BU: Spawn the thread that registers routes and calls listen().
@@ -29,7 +29,9 @@ class HttpServer {
   Engine& engine_;              // BU: Simulation engine this API drives.
   UdpSender& udp_;              // BU: UDP sender reconfigured when /api/udp or a scenario load changes destination.
   std::string scenarios_dir_;   // BU: Directory scanned/written by /api/scenarios.
+  std::string web_root_;        // BU: Optional frontend/dist to serve the UI from this process (empty = API only).
   int port_;                    // BU: HTTP listen port (default 8080).
+  int ws_port_;                 // BU: Advertised WS port so the bundled UI can connect without Vite.
   WsServer* ws_{nullptr};       // BU: Optional live-feed server pointer.
   std::atomic<bool> running_{false};  // BU: True while the listen thread is supposed to be up.
   std::thread thread_;          // BU: Background thread running httplib::Server::listen.

@@ -23,11 +23,13 @@ httplib::Server* g_http_svr = nullptr;  // BU: Pointer to the live httplib insta
 }  // namespace
 
 HttpServer::HttpServer(Engine& engine, UdpSender& udp, std::string scenarios_dir,
-                       int port)
+                       std::string web_root, int port, int ws_port)
     : engine_(engine),                         // BU: Engine this API mutates.
       udp_(udp),                               // BU: UDP sender reconfigured with scenario/UI settings.
       scenarios_dir_(std::move(scenarios_dir)),  // BU: Folder of *.json scenarios.
-      port_(port) {}                           // BU: Listen port.
+      web_root_(std::move(web_root)),          // BU: Bundled React dist, or empty.
+      port_(port),                             // BU: Listen port.
+      ws_port_(ws_port) {}                     // BU: Published in /api/health for the bundled UI.
 
 HttpServer::~HttpServer() { stop(); }  // BU: Join the listen thread on destruction.
 
@@ -67,7 +69,9 @@ void HttpServer::start() {
     svr.Get("/api/health",                                             // BU: Liveness probe.
             [&](const httplib::Request& req, httplib::Response& res) {
               cors(req, res);                                          // BU: CORS on every JSON route.
-              res.set_content(R"({"ok":true})", "application/json");   // BU: Simple ok payload.
+              res.set_content(
+                  nlohmann::json{{"ok", true}, {"ws_port", ws_port_}}.dump(),
+                  "application/json");   // BU: UI uses ws_port when not behind the Vite proxy.
             });
 
     svr.Get("/api/state",                                              // BU: One-shot snapshot (WS is the live path).
@@ -264,6 +268,19 @@ void HttpServer::start() {
                                 "application/json");
               }
             });
+
+    if (!web_root_.empty()) {                                          // BU: Air-gap UI: serve Vite dist from this process.
+      std::error_code ec;
+      if (fs::is_directory(web_root_, ec)) {
+        if (svr.set_mount_point("/", web_root_)) {
+          std::cout << "[http] UI dir: " << web_root_ << "\n";         // BU: Browser can open http://host:port/ with no Node.
+        } else {
+          std::cerr << "[http] failed to mount UI " << web_root_ << "\n";
+        }
+      } else {
+        std::cerr << "[http] UI dir missing: " << web_root_ << "\n";
+      }
+    }
 
     std::cout << "[http] listening on 0.0.0.0:" << port_ << "\n";  // BU: Log bind address.
     svr.listen("0.0.0.0", port_);                                  // BU: Block until stop() — all interfaces.

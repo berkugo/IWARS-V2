@@ -52,7 +52,10 @@ export function useSimulation() {
     let scenarioPoll
 
     async function bootstrap() {
+      let wsPort = 8081
       try {
+        const h = await api.health()
+        if (typeof h?.ws_port === 'number') wsPort = h.ws_port
         const s = await api.state()
         if (!cancelled) {
           setState((prev) => ({ ...prev, ...s }))
@@ -63,6 +66,7 @@ export function useSimulation() {
         if (!cancelled) setError(e.message)
       }
       refreshScenarios()
+      if (!cancelled) connect(wsPort)
     }
 
     function applyIncoming(data) {
@@ -89,8 +93,8 @@ export function useSimulation() {
       })
     }
 
-    function connect() {
-      const ws = new WebSocket(wsUrl())
+    function connect(wsPort) {
+      const ws = new WebSocket(wsUrl(wsPort))
       wsRef.current = ws
       ws.onopen = () => {
         if (!cancelled) setConnected(true)
@@ -98,7 +102,7 @@ export function useSimulation() {
       ws.onclose = () => {
         if (!cancelled) {
           setConnected(false)
-          retry = setTimeout(connect, 1500)
+          retry = setTimeout(() => connect(wsPort), 1500)
         }
       }
       ws.onerror = () => ws.close()
@@ -113,7 +117,6 @@ export function useSimulation() {
     }
 
     bootstrap()
-    connect()
 
     // Only poll HTTP when WS is down (avoids duplicate 10Hz + 0.5Hz churn)
     poll = setInterval(async () => {

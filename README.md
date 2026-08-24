@@ -30,11 +30,10 @@ Every scenario always includes a static AEW ownship (**AEWC737**). It cannot be 
 
 ```
 ┌─────────────────────┐     HTTP :8080      ┌──────────────────────┐
-│  React + Leaflet UI │◄───────────────────►│  iwars_sim (C++20)   │
-│  Vite :5173         │     WS   :8081      │                      │
-│                     │                     │  Engine  10 Hz tick  │
-│  Simulation         │                     │  Scenario JSON I/O   │
-│  Scenario Editor    │                     │  HTTP + WebSocket    │
+│  Bundled React UI   │◄───────────────────►│  iwars_sim (C++20)   │
+│  (frontend/dist)    │     WS   :8081      │  + static file serve │
+│  Simulation         │                     │  Engine  10 Hz tick  │
+│  Scenario Editor    │                     │  Scenario JSON I/O   │
 │  UDP Config         │                     │  UDP sender (IWP2)   │
 └─────────────────────┘                     └──────────┬───────────┘
                                                        │ UDP :9000
@@ -62,40 +61,47 @@ Every scenario always includes a static AEW ownship (**AEWC737**). It cannot be 
 
 ## Requirements
 
-- CMake ≥ 3.20, a C++20 compiler, OpenSSL, pthread
-- Node.js 20+ (frontend)
+- CMake ≥ 3.20, a C++20 compiler, pthread
+- Node.js 20+ **only if you rebuild the UI** (`frontend/src`)
+
+Air-gapped run needs **no npm and no Node**: the C++ binary serves the prebuilt UI from `frontend/dist`.
 
 ---
 
-## Run
-
-### Backend
+## Run (offline)
 
 ```bash
 cmake -S backend -B backend/build
 cmake --build backend/build -j
-IWARS_SCENARIOS=/root/IWARS-V2/scenarios ./backend/build/iwars_sim
+./backend/build/iwars_sim
 ```
+
+Open **http://127.0.0.1:8080/** — map, editor, and API come from the same process. WebSocket is `ws://127.0.0.1:8081`.
 
 Defaults:
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `IWARS_HTTP_PORT` | `8080` | REST API |
+| `IWARS_HTTP_PORT` | `8080` | REST API + bundled UI |
 | `IWARS_WS_PORT` | `8081` | Live state WebSocket |
 | `IWARS_SCENARIOS` | auto-detected `scenarios/` | Scenario JSON directory |
+| `IWARS_WEBROOT` | auto-detected `frontend/dist` | Static UI files |
 
 On startup the engine loads `demo_radar_air.json` if present, otherwise `demo_ankara.json`, otherwise a blank picture centered on Ankara.
 
-### Frontend
+### Rebuild the UI (online machine only)
+
+`frontend/src` stays the source. After a UI change:
 
 ```bash
 cd frontend
-npm install
-npm run dev
+npm ci
+npm run build
 ```
 
-Vite serves on `http://127.0.0.1:5173` and proxies `/api` → `:8080` and `/ws` → `:8081`.
+Commit the updated `frontend/dist`. Air-gap machines just pull and rebuild C++ (or copy the binary).
+
+Vite `npm run dev` on `:5173` still works for local hacking; it proxies `/api` → `:8080` and `/ws` → `:8081`.
 
 ---
 

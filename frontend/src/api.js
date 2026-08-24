@@ -47,8 +47,11 @@ export const api = {
     }),
 }
 
-export function wsUrl() {
+export function wsUrl(wsPort = 8081) {
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  // Proxy through Vite in dev so host matches the page (remote browsers too)
-  return `${proto}://${window.location.host}/ws`
+  // Dev: Vite proxies /ws on the page host. Prod: UI is on :8080, WS on :8081.
+  if (import.meta.env.DEV) {
+    return `${proto}://${window.location.host}/ws`
+  }
+  return `${proto}://${window.location.hostname}:${wsPort}`
 }
