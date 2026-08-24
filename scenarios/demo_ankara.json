@@ -1,0 +1,60 @@
+{
+  "name": "demo_ankara",
+  "description": "Sample moving entities around the map center",
+  "center_lat": 39.9334,
+  "center_lon": 32.8597,
+  "zoom": 11,
+  "udp": {
+    "host": "127.0.0.1",
+    "port": 9000,
+    "enabled": false
+  },
+  "entities": [
+    {
+      "id": "blue-1",
+      "name": "Blue Patrol",
+      "side": "blue",
+      "entity_type": "vehicle",
+      "lat": 39.9200,
+      "lon": 32.8500,
+      "alt": 0,
+      "heading_deg": 45,
+      "speed_mps": 12,
+      "route": [
+        {"lat": 39.9400, "lon": 32.8700},
+        {"lat": 39.9500, "lon": 32.8600},
+        {"lat": 39.9300, "lon": 32.8400}
+      ],
+      "route_index": 0
+    },
+    {
+      "id": "red-1",
+      "name": "Red Scout",
+      "side": "red",
+      "entity_type": "vehicle",
+      "lat": 39.9500,
+      "lon": 32.8800,
+      "alt": 0,
+      "heading_deg": 220,
+      "speed_mps": 8,
+      "route": [
+        {"lat": 39.9350, "lon": 32.8650},
+        {"lat": 39.9250, "lon": 32.8550}
+      ],
+      "route_index": 0
+    },
+    {
+      "id": "civ-1",
+      "name": "Neutral Truck",
+      "side": "neutral",
+      "entity_type": "vehicle",
+      "lat": 39.9280,
+      "lon": 32.8700,
+      "alt": 0,
+      "heading_deg": 90,
+      "speed_mps": 5,
+      "route": [],
+      "route_index": 0
+    }
+  ]
+}

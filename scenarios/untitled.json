@@ -1,0 +1,87 @@
+{
+  "center_lat": 39.9334,
+  "center_lon": 32.8597,
+  "description": "",
+  "entities": [
+    {
+      "affiliation": "friend",
+      "alt": 9500.0,
+      "alt_m": 9500.0,
+      "climb_mps": 0.0,
+      "entity_type": "aew",
+      "heading_deg": 90.0,
+      "id": "ownship",
+      "iff_enabled": true,
+      "iff_mode": "3A",
+      "lat": 39.9334,
+      "lon": 32.8597,
+      "mode_4": true,
+      "mode_c": true,
+      "name": "AEWC737",
+      "platform": "aew",
+      "route": [],
+      "route_index": 0,
+      "side": "friend",
+      "speed_mps": 0.0,
+      "squawk": "0001"
+    },
+    {
+      "affiliation": "friend",
+      "alt": 8000.0,
+      "alt_m": 8000.0,
+      "climb_mps": 0.0,
+      "entity_type": "fighter",
+      "heading_deg": 0.0,
+      "id": "tgt-2",
+      "iff_enabled": true,
+      "iff_mode": "3A",
+      "lat": 40.07807142745009,
+      "lon": 28.740234375000004,
+      "mode_4": false,
+      "mode_c": true,
+      "name": "TGT-2",
+      "platform": "fighter",
+      "route": [
+        {
+          "lat": 38.64261790634527,
+          "lon": 27.169189453125004
+        },
+        {
+          "lat": 38.47939467327645,
+          "lon": 27.817382812500004
+        },
+        {
+          "lat": 38.8824811975508,
+          "lon": 27.575683593750004
+        },
+        {
+          "lat": 39.93501296038254,
+          "lon": 27.938232421875004
+        },
+        {
+          "lat": 40.17047886718111,
+          "lon": 28.300781250000004
+        },
+        {
+          "lat": 40.136890695345905,
+          "lon": 28.092041015625004
+        },
+        {
+          "lat": 40.287906612507406,
+          "lon": 28.7841796875
+        }
+      ],
+      "route_index": 0,
+      "side": "friend",
+      "speed_mps": 250.0,
+      "squawk": "1200"
+    }
+  ],
+  "name": "untitled",
+  "udp": {
+    "enabled": false,
+    "host": "127.0.0.1",
+    "port": 9000
+  },
+  "zoom": 6
+}

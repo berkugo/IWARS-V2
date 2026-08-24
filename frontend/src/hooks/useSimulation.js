@@ -1,0 +1,190 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { api, wsUrl } from '../api'
+
+const emptyState = {
+  name: 'untitled',
+  description: '',
+  center_lat: 39.9334,
+  center_lon: 32.8597,
+  zoom: 11,
+  udp: { host: '127.0.0.1', port: 9000, enabled: false },
+  entities: [],
+  playing: false,
+  sim_time: 0,
+}
+
+function entitiesFingerprint(entities) {
+  if (!Array.isArray(entities)) return ''
+  // Coarse — enough to skip identical pause heartbeats
+  return entities
+    .map(
+      (e) =>
+        `${e.id}:${Number(e.lat).toFixed(5)},${Number(e.lon).toFixed(5)},${Number(
+          e.heading_deg,
+        ).toFixed(0)},${Number(e.speed_mps).toFixed(1)},${Number(e.alt_m).toFixed(0)},${
+          (e.route || []).length
+        }`,
+    )
+    .join('|')
+}
+
+export function useSimulation() {
+  const [state, setState] = useState(emptyState)
+  const [connected, setConnected] = useState(false)
+  const [error, setError] = useState(null)
+  const [scenarios, setScenarios] = useState([])
+  const wsRef = useRef(null)
+  const lastFp = useRef('')
+
+  const refreshScenarios = useCallback(async () => {
+    try {
+      const list = await api.listScenarios()
+      setScenarios(list)
+    } catch (e) {
+      console.warn(e)
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    let retry
+    let poll
+    let scenarioPoll
+
+    async function bootstrap() {
+      try {
+        const s = await api.state()
+        if (!cancelled) {
+          setState((prev) => ({ ...prev, ...s }))
+          lastFp.current = entitiesFingerprint(s.entities)
+          setError(null)
+        }
+      } catch (e) {
+        if (!cancelled) setError(e.message)
+      }
+      refreshScenarios()
+    }
+
+    function applyIncoming(data) {
+      setState((prev) => {
+        const playing = !!data.playing
+        if (!playing && !prev.playing) {
+          const fp = entitiesFingerprint(data.entities)
+          if (
+            fp === lastFp.current &&
+            prev.name === data.name &&
+            prev.udp?.host === data.udp?.host &&
+            prev.udp?.port === data.udp?.port &&
+            !!prev.udp?.enabled === !!data.udp?.enabled
+          ) {
+            // Heartbeat with no change — skip re-render
+            if (prev.sim_time === data.sim_time) return prev
+            return { ...prev, sim_time: data.sim_time, playing: false }
+          }
+          lastFp.current = fp
+        } else if (playing) {
+          lastFp.current = entitiesFingerprint(data.entities)
+        }
+        return { ...prev, ...data }
+      })
+    }
+
+    function connect() {
+      const ws = new WebSocket(wsUrl())
+      wsRef.current = ws
+      ws.onopen = () => {
+        if (!cancelled) setConnected(true)
+      }
+      ws.onclose = () => {
+        if (!cancelled) {
+          setConnected(false)
+          retry = setTimeout(connect, 1500)
+        }
+      }
+      ws.onerror = () => ws.close()
+      ws.onmessage = (ev) => {
+        try {
+          applyIncoming(JSON.parse(ev.data))
+          if (!cancelled) setError(null)
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+
+    bootstrap()
+    connect()
+
+    // Only poll HTTP when WS is down (avoids duplicate 10Hz + 0.5Hz churn)
+    poll = setInterval(async () => {
+      if (wsRef.current?.readyState === WebSocket.OPEN) return
+      try {
+        const s = await api.state()
+        if (!cancelled) {
+          applyIncoming(s)
+          setError(null)
+        }
+      } catch (e) {
+        if (!cancelled) setError(e.message || 'Backend unreachable')
+      }
+    }, 3000)
+
+    scenarioPoll = setInterval(() => {
+      if (!cancelled) refreshScenarios()
+    }, 15000)
+
+    return () => {
+      cancelled = true
+      clearTimeout(retry)
+      clearInterval(poll)
+      clearInterval(scenarioPoll)
+      wsRef.current?.close()
+    }
+  }, [refreshScenarios])
+
+  const applyState = (data) => {
+    lastFp.current = entitiesFingerprint(data.entities)
+    setState((prev) => ({ ...prev, ...data }))
+  }
+
+  return {
+    state,
+    connected,
+    error,
+    scenarios,
+    refreshScenarios,
+    play: async () => {
+      await api.play()
+    },
+    pause: async () => {
+      await api.pause()
+    },
+    reset: async () => {
+      applyState(await api.reset())
+    },
+    setUdp: async (udp) => {
+      const next = await api.setUdp(udp)
+      setState((prev) => ({ ...prev, udp: next }))
+    },
+    addEntity: async (entity) => {
+      applyState(await api.addEntity(entity))
+    },
+    updateEntity: async (id, entity) => {
+      applyState(await api.updateEntity(id, entity))
+    },
+    removeEntity: async (id) => {
+      applyState(await api.removeEntity(id))
+    },
+    replaceScenario: async (scenario) => {
+      applyState(await api.replaceScenario(scenario))
+    },
+    loadScenario: async (filename) => {
+      applyState(await api.loadScenario(filename))
+      await refreshScenarios()
+    },
+    saveScenario: async (filename, nameOverride) => {
+      await api.saveScenario(filename, nameOverride ?? state.name)
+      await refreshScenarios()
+    },
+  }
+}

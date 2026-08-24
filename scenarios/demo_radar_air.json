@@ -1,0 +1,183 @@
+{
+  "name": "demo_radar_air",
+  "description": "Air C4ISR picture \u2014 AEWC737 ownship plus fighter, UAV, and hostile tracks",
+  "center_lat": 39.9334,
+  "center_lon": 32.8597,
+  "zoom": 6,
+  "udp": {
+    "host": "127.0.0.1",
+    "port": 9000,
+    "enabled": false
+  },
+  "entities": [
+    {
+      "id": "ownship",
+      "name": "AEWC737",
+      "affiliation": "friend",
+      "platform": "aew",
+      "lat": 39.9334,
+      "lon": 32.8597,
+      "alt_m": 9500,
+      "heading_deg": 90,
+      "speed_mps": 0,
+      "climb_mps": 0,
+      "iff_enabled": true,
+      "iff_mode": "3A",
+      "squawk": "0001",
+      "mode_c": true,
+      "mode_4": true,
+      "mode_5": true,
+      "ownship": true,
+      "route": [],
+      "route_index": 0
+    },
+    {
+      "id": "frd-01",
+      "name": "VIPER1",
+      "affiliation": "friend",
+      "platform": "fighter",
+      "lat": 39.85,
+      "lon": 32.7,
+      "alt_m": 6500,
+      "heading_deg": 35,
+      "speed_mps": 250,
+      "climb_mps": 0,
+      "iff_enabled": true,
+      "iff_mode": "3A",
+      "squawk": "4521",
+      "mode_c": true,
+      "mode_4": true,
+      "mode_5": true,
+      "route": [
+        {
+          "lat": 40.05,
+          "lon": 32.95
+        },
+        {
+          "lat": 40.15,
+          "lon": 33.1
+        }
+      ],
+      "route_index": 0
+    },
+    {
+      "id": "hst-01",
+      "name": "BANDIT",
+      "affiliation": "hostile",
+      "platform": "fighter",
+      "lat": 40.1,
+      "lon": 33.05,
+      "alt_m": 8200,
+      "heading_deg": 240,
+      "speed_mps": 280,
+      "climb_mps": -5,
+      "iff_enabled": false,
+      "iff_mode": "off",
+      "squawk": "0000",
+      "mode_c": false,
+      "mode_4": false,
+      "mode_5": false,
+      "route": [
+        {
+          "lat": 39.9,
+          "lon": 32.8
+        },
+        {
+          "lat": 39.8,
+          "lon": 32.65
+        }
+      ],
+      "route_index": 0
+    },
+    {
+      "id": "uav-01",
+      "name": "RAVEN1",
+      "affiliation": "friend",
+      "platform": "uav",
+      "lat": 39.95,
+      "lon": 32.9,
+      "alt_m": 4500,
+      "heading_deg": 90,
+      "speed_mps": 45,
+      "climb_mps": 0,
+      "iff_enabled": true,
+      "iff_mode": "3A",
+      "squawk": "7001",
+      "mode_c": true,
+      "mode_4": true,
+      "mode_5": false,
+      "route": [],
+      "route_index": 0
+    },
+    {
+      "id": "ucav-01",
+      "name": "REAPER1",
+      "affiliation": "friend",
+      "platform": "ucav",
+      "lat": 40.2,
+      "lon": 32.6,
+      "alt_m": 5000,
+      "heading_deg": 180,
+      "speed_mps": 55,
+      "climb_mps": 0,
+      "iff_enabled": true,
+      "iff_mode": "3A",
+      "squawk": "7010",
+      "mode_c": true,
+      "mode_4": true,
+      "mode_5": false,
+      "route": [
+        {
+          "lat": 39.6,
+          "lon": 32.6
+        }
+      ],
+      "route_index": 0
+    },
+    {
+      "id": "unk-01",
+      "name": "SKUNK",
+      "affiliation": "unknown",
+      "platform": "helicopter",
+      "lat": 39.88,
+      "lon": 32.95,
+      "alt_m": 900,
+      "heading_deg": 310,
+      "speed_mps": 45,
+      "climb_mps": 2,
+      "iff_enabled": true,
+      "iff_mode": "3A",
+      "squawk": "1200",
+      "mode_c": true,
+      "mode_4": false,
+      "mode_5": false,
+      "route": [],
+      "route_index": 0
+    },
+    {
+      "id": "civ-01",
+      "name": "CIV482",
+      "affiliation": "neutral",
+      "platform": "civil",
+      "lat": 40.0,
+      "lon": 33.4,
+      "alt_m": 11000,
+      "heading_deg": 270,
+      "speed_mps": 230,
+      "climb_mps": 0,
+      "iff_enabled": true,
+      "iff_mode": "S",
+      "squawk": "2614",
+      "mode_c": true,
+      "mode_4": false,
+      "mode_5": false,
+      "route": [
+        {
+          "lat": 40.0,
+          "lon": 32.2
+        }
+      ],
+      "route_index": 0
+    }
+  ]
+}
