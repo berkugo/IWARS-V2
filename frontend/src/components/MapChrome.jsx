@@ -27,7 +27,7 @@ export default function MapChrome({
   const kt = selected ? Math.round(mpsToKt(selected.speed_mps)) : null
   const fl = selected ? altToFL(selected.alt_m ?? selected.alt) : null
   const banner = mode === 'editor' ? TOOL_BANNER[tool] : null
-  const wpCount = selected && !selected.ownship ? (selected.route || []).length : 0
+  const wpCount = selected ? (selected.route || []).length : 0
 
   return (
     <>
@@ -62,9 +62,9 @@ export default function MapChrome({
         </div>
       )}
 
-      {mode === 'editor' && tool === 'add_waypoint' && (!selected || selected.ownship) && (
+      {mode === 'editor' && tool === 'add_waypoint' && !selected && (
         <div className="pointer-events-none absolute left-1/2 top-16 z-[500] -translate-x-1/2 border border-[var(--unknown)] bg-black/80 px-4 py-2 text-[11px] uppercase tracking-[0.14em] text-[var(--unknown)]">
-          Select a non-ownship track first
+          Select a track first
         </div>
       )}
 

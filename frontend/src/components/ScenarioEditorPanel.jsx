@@ -31,7 +31,7 @@ export default function ScenarioEditorPanel({
 }) {
   const trackCount = (state.entities || []).filter((e) => !e.ownship).length
   const wpCount = (state.entities || []).reduce(
-    (n, e) => n + (e.ownship ? 0 : (e.route || []).length),
+    (n, e) => n + (e.route || []).length,
     0,
   )
 

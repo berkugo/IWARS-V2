@@ -125,8 +125,8 @@ const EntityLayer = memo(function EntityLayer({
   onDragEntity,
 }) {
   const aff = e.affiliation || e.side || 'unknown'
-  const color = AFF_COLOR[aff] || AFF_COLOR.unknown
   const own = isOwnship(e)
+  const color = own ? '#7af5dc' : AFF_COLOR[aff] || AFF_COLOR.unknown
   const route = useMemo(
     () => (e.route || []).map((w) => [w.lat, w.lon]),
     [e.route],
@@ -160,7 +160,7 @@ const EntityLayer = memo(function EntityLayer({
 
   return (
     <Fragment>
-      {linePositions && !own && (
+      {linePositions && (
         <>
           <Polyline
             positions={linePositions}

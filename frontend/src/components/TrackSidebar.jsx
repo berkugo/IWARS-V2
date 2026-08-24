@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import {
   AFFILIATIONS,
   IFF_MODES,
+  OWNSHIP_CALLSIGN,
+  OWNSHIP_ID,
   PLATFORMS,
   altToFL,
   isOwnship,
@@ -107,10 +109,11 @@ export default function TrackSidebar({
       route_index: Math.max(0, finiteNum(entity.route_index, 0)),
     }
     if (isOwnship(payload)) {
-      payload.speed_mps = 0
-      payload.climb_mps = 0
-      payload.route = []
-      payload.route_index = 0
+      payload.id = OWNSHIP_ID
+      payload.name = OWNSHIP_CALLSIGN
+      payload.affiliation = 'friend'
+      payload.platform = 'aew'
+      payload.ownship = true
     }
     skipSyncUntil.current = Date.now() + 2000
     try {
@@ -146,15 +149,7 @@ export default function TrackSidebar({
           next.alt_m = p.alt
         }
       }
-      if (
-        !editorMode &&
-        (field === 'heading_deg' ||
-          field === 'speed_mps' ||
-          field === 'climb_mps' ||
-          field === 'lat' ||
-          field === 'lon' ||
-          field === 'alt_m')
-      ) {
+      if (field === 'heading_deg') {
         next.route = []
         next.route_index = 0
       }
@@ -264,7 +259,7 @@ export default function TrackSidebar({
                         FL
                         <span className="text-[var(--text)]">{String(fl).padStart(3, '0')}</span>
                       </span>
-                      {own ? (
+                      {own && kt < 1 ? (
                         <span className="text-[var(--accent)]">STATIC</span>
                       ) : (
                         <span>
@@ -310,7 +305,7 @@ export default function TrackSidebar({
                     className="border border-[var(--accent)] bg-[var(--accent-dim)] px-2 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--accent)]"
                     style={{ fontFamily: 'var(--font-display)' }}
                   >
-                    OWNSHIP · AEWC737 · STATIC
+                    OWNSHIP · AEWC737
                   </div>
                 )}
                 <Row k="Callsign" v={draft.name || draft.id} />
@@ -354,7 +349,7 @@ export default function TrackSidebar({
                     className="border border-[var(--accent)] bg-[var(--accent-dim)] px-2 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--accent)]"
                     style={{ fontFamily: 'var(--font-display)' }}
                   >
-                    OWNSHIP · AEWC737 · STATIC
+                    OWNSHIP · AEWC737
                   </div>
                 )}
 
@@ -448,7 +443,6 @@ export default function TrackSidebar({
                       step="1"
                       className="stitch-input"
                       value={Math.round(mpsToKt(draft.speed_mps) * 10) / 10}
-                      disabled={isOwnship(draft)}
                       onChange={(e) =>
                         patchDraft('speed_mps', ktToMps(finiteNum(e.target.value)), true)
                       }
@@ -463,7 +457,6 @@ export default function TrackSidebar({
                       step="0.1"
                       className="stitch-input"
                       value={draft.climb_mps ?? 0}
-                      disabled={isOwnship(draft)}
                       onChange={(e) =>
                         patchDraft('climb_mps', finiteNum(e.target.value), true)
                       }
@@ -475,12 +468,10 @@ export default function TrackSidebar({
                   style={{ fontFamily: 'var(--font-mono)' }}
                 >
                   ≈ FL{String(altToFL(draft.alt_m ?? draft.alt)).padStart(3, '0')}
-                  {isOwnship(draft)
-                    ? ' · STATIONARY'
-                    : ` · ${finiteNum(draft.speed_mps).toFixed(1)} m/s`}
+                  {` · ${finiteNum(draft.speed_mps).toFixed(1)} m/s`}
                 </div>
 
-                {editorMode && !isOwnship(draft) && (
+                {editorMode && (
                   <>
                     <div
                       className="pt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]"

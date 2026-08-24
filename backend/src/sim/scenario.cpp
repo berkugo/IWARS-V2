@@ -50,7 +50,7 @@ void Scenario::ensure_ownship() {
     filtered.push_back(std::move(e));                            // BU: Preserve ordinary tracks in order.
   }
   if (found) {                                                   // BU: File had an ownship — lock identity, keep pose.
-    normalize_ownship(kept);                                     // BU: Force AEWC737 static kinematics.
+    normalize_ownship(kept);                                     // BU: Lock AEWC737 identity; keep pose/speed/route.
   } else {
     kept = make_ownship(meta.center_lat, meta.center_lon);       // BU: Synthesize ownship at the map center.
   }

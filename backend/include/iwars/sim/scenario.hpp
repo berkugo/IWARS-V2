@@ -40,7 +40,7 @@ class Scenario {
   Entity* find(const std::string& id);                     // BU: Mutable lookup by track id, or nullptr.
   const Entity* find(const std::string& id) const;         // BU: Const lookup by track id, or nullptr.
 
-  /** Guarantee static AEWC737 ownship is present (first entity). */
+  /** Guarantee AEWC737 ownship is present (first entity). */
   void ensure_ownship();                                   // BU: Deduplicate ownship-like tracks and insert AEWC737 first.
 };
 

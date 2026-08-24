@@ -134,18 +134,8 @@ bool Engine::update_entity(const Entity& e) {
   auto* cur = scenario_.find(e.id);       // BU: Locate the live entity.
   if (!cur) return false;                 // BU: Unknown id.
   Entity next = e;                        // BU: Start from the posted body.
-  if (is_ownship(*cur) || is_ownship(next)) {  // BU: Ownship only accepts pose + IFF edits.
-    next.lat = e.lat;                     // BU: Allow dragging ownship on the map.
-    next.lon = e.lon;                     // BU: Allow dragging ownship on the map.
-    next.alt_m = e.alt_m;                 // BU: Allow altitude edits.
-    next.heading_deg = e.heading_deg;     // BU: Allow heading edits (icon orientation).
-    next.iff_enabled = e.iff_enabled;     // BU: Allow IFF master switch.
-    next.iff_mode = e.iff_mode;           // BU: Allow mode changes.
-    next.squawk = e.squawk;               // BU: Allow squawk edits.
-    next.mode_c = e.mode_c;               // BU: Allow Mode C flag.
-    next.mode_4 = e.mode_4;               // BU: Allow Mode 4 flag.
-    next.mode_5 = e.mode_5;               // BU: Allow Mode 5 flag.
-    normalize_ownship(next);              // BU: Force id/callsign/platform/speed=0/no route.
+  if (is_ownship(*cur) || is_ownship(next)) {
+    normalize_ownship(next);              // BU: Lock id/callsign/platform; keep posted speed/pose/IFF/route.
   }
   *cur = next;                            // BU: Commit the patch to the live list.
   if (auto* init = initial_.find(e.id)) *init = next;  // BU: Keep reset() in sync with editor changes.
@@ -219,14 +209,12 @@ void Engine::loop() {
 
 void Engine::tick(double dt) {
   std::lock_guard lock(mu_);                // BU: Integrate under the same lock as HTTP mutations.
-  for (auto& e : scenario_.entities) {      // BU: Advance every track, including ownship (which no-ops).
+  for (auto& e : scenario_.entities) {      // BU: Advance every track, including ownship.
     advance_entity(e, dt);                  // BU: Route-follow or dead-reckon this entity.
   }
 }
 
 void Engine::advance_entity(Entity& e, double dt) {
-  if (is_ownship(e)) return;  // BU: AEWC737 ownship is always static.
-
   if (!e.route.empty() && e.route_index < e.route.size()) {  // BU: Still have an unfinished waypoint.
     const auto& wp = e.route[e.route_index];                 // BU: Current target waypoint.
     const double dist = haversine_m(e.lat, e.lon, wp.lat, wp.lon);  // BU: Meters remaining to the waypoint.
@@ -235,11 +223,7 @@ void Engine::advance_entity(Entity& e, double dt) {
       e.lat = wp.lat;                                        // BU: Snap onto the waypoint.
       e.lon = wp.lon;                                        // BU: Snap onto the waypoint.
       ++e.route_index;                                       // BU: Advance to the next vertex.
-      if (e.route_index >= e.route.size()) {                 // BU: Last waypoint reached.
-        // Route finished — stop once; leave route_index at size so we
-        // do not re-enter and force speed=0 every tick.
-        e.speed_mps = 0;                                     // BU: Hold position after the route.
-      }
+      // BU: Do not zero speed when the route ends — keep dead-reckoning on last heading.
       return;                                                // BU: Do not also dead-reckon this same dt.
     }
   }

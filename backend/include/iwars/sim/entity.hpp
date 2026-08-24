@@ -60,7 +60,7 @@ inline bool is_ownship(const Entity& e) {
   return e.ownship || e.id == kOwnshipId || e.name == kOwnshipCallsign;
 }
 
-/** Static B737 AEW&C ownship — present in every scenario, never moves. */
+/** B737 AEW&C ownship — always present; kinematics are operator-editable. */
 // BU: Factory for a default AEWC737 sitting at the given map center, FL312, heading east.
 inline Entity make_ownship(double lat, double lon) {
   Entity e;                         // BU: Start from default-constructed zeros / defaults.
@@ -72,8 +72,7 @@ inline Entity make_ownship(double lat, double lon) {
   e.lon = lon;                      // BU: Place it at the requested longitude.
   e.alt_m = 9500;                   // BU: Default cruise altitude ~FL312.
   e.heading_deg = 90;               // BU: Default heading east.
-  e.speed_mps = 0;                  // BU: Ownship is static — no ground speed.
-  e.climb_mps = 0;                  // BU: Ownship is static — no climb.
+  e.speed_mps = 0;                  // BU: Default parked; operator may later set a cruise speed.
   e.iff_enabled = true;             // BU: Ownship replies to IFF.
   e.iff_mode = "3A";                // BU: Default Mode 3/A.
   e.squawk = "0001";                // BU: Distinct ownship squawk.
@@ -81,23 +80,18 @@ inline Entity make_ownship(double lat, double lon) {
   e.mode_4 = true;                  // BU: Crypto friend reply enabled for ownship.
   e.mode_5 = true;                  // BU: Mode 5 enabled for ownship.
   e.ownship = true;                 // BU: Mark as the protected ownship.
-  e.route.clear();                  // BU: Ownship never follows a route.
-  e.route_index = 0;                // BU: Route index is unused for ownship.
+  e.route.clear();                  // BU: Default empty route; operator may add waypoints later.
+  e.route_index = 0;                // BU: Start at the first waypoint if a route is later added.
   return e;                         // BU: Return the fully specified ownship entity.
 }
 
-/** Force AEWC737 identity + static kinematics; keep pose / IFF edits. */
-// BU: Clamp identity/kinematics so clients cannot turn ownship into a moving fighter.
+/** Force AEWC737 identity; pose / speed / IFF remain operator-editable. */
 inline void normalize_ownship(Entity& e) {
   e.id = kOwnshipId;                // BU: Restore canonical id.
   e.name = kOwnshipCallsign;        // BU: Restore AEWC737 callsign.
   e.affiliation = "friend";         // BU: Ownship affiliation is not editable.
   e.platform = "aew";               // BU: Ownship platform is not editable.
   e.ownship = true;                 // BU: Keep the ownship flag set.
-  e.speed_mps = 0;                  // BU: Zero ground speed so the engine never integrates it.
-  e.climb_mps = 0;                  // BU: Zero climb so altitude only changes via explicit edits.
-  e.route.clear();                  // BU: Strip any route a client might have posted.
-  e.route_index = 0;                // BU: Reset route cursor.
   if (e.alt_m <= 0) e.alt_m = 9500; // BU: If altitude was cleared, restore the default FL.
 }
 

@@ -39,7 +39,7 @@ class Engine {
   void set_udp(UdpConfig cfg);              // BU: Update the scenario's UDP block without replacing entities.
 
   bool add_entity(Entity e);                // BU: Insert a non-ownship track; false on duplicate/ownship id.
-  bool update_entity(const Entity& e);      // BU: Patch a track by id; ownship kinematics stay static.
+  bool update_entity(const Entity& e);      // BU: Patch a track by id; ownship identity stays locked.
   bool remove_entity(const std::string& id);  // BU: Delete a track; ownship cannot be removed.
 
   void set_state_callback(StateCallback cb);  // BU: Install the WS/UDP publisher invoked each push.

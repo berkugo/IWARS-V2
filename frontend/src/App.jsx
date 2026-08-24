@@ -6,7 +6,7 @@ import MapChrome from './components/MapChrome'
 import UdpConfigPage from './components/UdpConfigPage'
 import ScenarioEditorPanel from './components/ScenarioEditorPanel'
 import { useSimulation } from './hooks/useSimulation'
-import { defaultEntity, isOwnship, makeOwnship } from './radarTypes'
+import { defaultEntity, makeOwnship } from './radarTypes'
 
 function newEntityId(entities) {
   let n = entities.length + 1
@@ -59,7 +59,7 @@ export default function App() {
         return
       }
       if (isEditor && tool === 'add_waypoint') {
-        if (!selectedId || isOwnship(selected)) return
+        if (!selectedId) return
         const e = entities.find((x) => x.id === selectedId)
         if (!e) return
         const route = [...(e.route || []), { lat, lon }]
@@ -68,7 +68,7 @@ export default function App() {
       }
       // Simulation: optional quick-add via tool not used; ignore
     },
-    [isEditor, tool, entities, sim, selectedId, selected],
+    [isEditor, tool, entities, sim, selectedId],
   )
 
   const handleDrag = useCallback(
@@ -98,7 +98,7 @@ export default function App() {
   const handleClearRoute = useCallback(
     async (id) => {
       const e = entities.find((x) => x.id === id)
-      if (!e || isOwnship(e)) return
+      if (!e) return
       await sim.updateEntity(id, { ...e, route: [], route_index: 0 })
     },
     [entities, sim],
@@ -107,7 +107,7 @@ export default function App() {
   const handleRemoveWaypoint = useCallback(
     async (id, index) => {
       const e = entities.find((x) => x.id === id)
-      if (!e || isOwnship(e)) return
+      if (!e) return
       const route = (e.route || []).filter((_, i) => i !== index)
       await sim.updateEntity(id, { ...e, route, route_index: 0 })
     },
