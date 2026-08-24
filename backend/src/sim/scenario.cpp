@@ -5,87 +5,87 @@
 namespace iwars {
 
 nlohmann::json Scenario::to_json() const {
-  return nlohmann::json{
-      {"name", meta.name},
-      {"description", meta.description},
-      {"center_lat", meta.center_lat},
-      {"center_lon", meta.center_lon},
-      {"zoom", meta.zoom},
-      {"udp",
+  return nlohmann::json{                                         // BU: Object the UI and files both understand.
+      {"name", meta.name},                                       // BU: Scenario title.
+      {"description", meta.description},                         // BU: Optional blurb.
+      {"center_lat", meta.center_lat},                           // BU: Map camera latitude.
+      {"center_lon", meta.center_lon},                           // BU: Map camera longitude.
+      {"zoom", meta.zoom},                                       // BU: Leaflet zoom.
+      {"udp",                                                    // BU: Nested UDP destination block.
        {{"host", udp.host}, {"port", udp.port}, {"enabled", udp.enabled}}},
-      {"entities", entities},
+      {"entities", entities},                                    // BU: Array of Entity (uses to_json ADL).
   };
 }
 
 void Scenario::from_json(const nlohmann::json& j) {
-  meta.name = j.value("name", std::string{"untitled"});
-  meta.description = j.value("description", std::string{});
-  meta.center_lat = j.value("center_lat", 39.9334);
-  meta.center_lon = j.value("center_lon", 32.8597);
-  meta.zoom = j.value("zoom", 10);
-  if (j.contains("udp") && j["udp"].is_object()) {
-    const auto& u = j["udp"];
-    udp.host = u.value("host", std::string{"127.0.0.1"});
-    udp.port = u.value("port", 9000);
-    udp.enabled = u.value("enabled", false);
+  meta.name = j.value("name", std::string{"untitled"});          // BU: Name, or "untitled".
+  meta.description = j.value("description", std::string{});      // BU: Description, or empty.
+  meta.center_lat = j.value("center_lat", 39.9334);              // BU: Camera lat, default Ankara.
+  meta.center_lon = j.value("center_lon", 32.8597);              // BU: Camera lon, default Ankara.
+  meta.zoom = j.value("zoom", 10);                               // BU: Zoom default 10.
+  if (j.contains("udp") && j["udp"].is_object()) {               // BU: Optional UDP object.
+    const auto& u = j["udp"];                                    // BU: Nested object.
+    udp.host = u.value("host", std::string{"127.0.0.1"});        // BU: Destination IPv4.
+    udp.port = u.value("port", 9000);                            // BU: Destination port.
+    udp.enabled = u.value("enabled", false);                     // BU: Send flag; default off.
   }
-  entities = j.value("entities", std::vector<Entity>{});
-  ensure_ownship();
+  entities = j.value("entities", std::vector<Entity>{});         // BU: Track list, or empty.
+  ensure_ownship();                                              // BU: Always finish with AEWC737 at index 0.
 }
 
 void Scenario::ensure_ownship() {
   // Drop duplicate ownship-like tracks; keep first match's pose if any
-  Entity kept;
-  bool found = false;
-  std::vector<Entity> filtered;
-  filtered.reserve(entities.size() + 1);
-  for (auto& e : entities) {
-    if (is_ownship(e)) {
-      if (!found) {
-        kept = e;
-        found = true;
+  Entity kept;                                                   // BU: The one ownship we will keep.
+  bool found = false;                                            // BU: Whether the file already had an ownship.
+  std::vector<Entity> filtered;                                  // BU: Non-ownship tracks plus one ownship at front.
+  filtered.reserve(entities.size() + 1);                         // BU: Avoid realloc while we scan.
+  for (auto& e : entities) {                                     // BU: Walk every loaded track.
+    if (is_ownship(e)) {                                         // BU: Id, callsign, or flag matches AEWC737.
+      if (!found) {                                              // BU: Keep the first ownship's pose/IFF.
+        kept = e;                                                // BU: Copy it aside.
+        found = true;                                            // BU: Ignore later duplicates.
       }
-      continue;
+      continue;                                                  // BU: Do not push ownship into the filtered body.
     }
-    filtered.push_back(std::move(e));
+    filtered.push_back(std::move(e));                            // BU: Preserve ordinary tracks in order.
   }
-  if (found) {
-    normalize_ownship(kept);
+  if (found) {                                                   // BU: File had an ownship — lock identity, keep pose.
+    normalize_ownship(kept);                                     // BU: Force AEWC737 static kinematics.
   } else {
-    kept = make_ownship(meta.center_lat, meta.center_lon);
+    kept = make_ownship(meta.center_lat, meta.center_lon);       // BU: Synthesize ownship at the map center.
   }
-  filtered.insert(filtered.begin(), std::move(kept));
-  entities = std::move(filtered);
+  filtered.insert(filtered.begin(), std::move(kept));            // BU: Ownship is always the first entity.
+  entities = std::move(filtered);                                // BU: Replace the list.
 }
 
 bool Scenario::load_file(const std::string& path) {
-  std::ifstream in(path);
-  if (!in) return false;
-  nlohmann::json j;
-  in >> j;
-  from_json(j);
-  return true;
+  std::ifstream in(path);                                        // BU: Open the JSON file.
+  if (!in) return false;                                         // BU: Missing/unreadable file.
+  nlohmann::json j;                                              // BU: Parse tree.
+  in >> j;                                                       // BU: Stream-parse JSON (throws on syntax error).
+  from_json(j);                                                  // BU: Fill meta/udp/entities + ensure ownship.
+  return true;                                                   // BU: Loaded.
 }
 
 bool Scenario::save_file(const std::string& path) const {
-  std::ofstream out(path);
-  if (!out) return false;
-  out << to_json().dump(2);
-  return static_cast<bool>(out);
+  std::ofstream out(path);                                       // BU: Open/truncate the destination.
+  if (!out) return false;                                        // BU: Cannot write (permissions/path).
+  out << to_json().dump(2);                                      // BU: Pretty-print with 2-space indent.
+  return static_cast<bool>(out);                                 // BU: False if the stream went bad mid-write.
 }
 
 Entity* Scenario::find(const std::string& id) {
-  for (auto& e : entities) {
-    if (e.id == id) return &e;
+  for (auto& e : entities) {                                     // BU: Linear scan is fine for small air pictures.
+    if (e.id == id) return &e;                                   // BU: Mutable pointer into the vector.
   }
-  return nullptr;
+  return nullptr;                                                // BU: Not found.
 }
 
 const Entity* Scenario::find(const std::string& id) const {
-  for (const auto& e : entities) {
-    if (e.id == id) return &e;
+  for (const auto& e : entities) {                               // BU: Const overload for snapshot/copy paths.
+    if (e.id == id) return &e;                                   // BU: Const pointer into the vector.
   }
-  return nullptr;
+  return nullptr;                                                // BU: Not found.
 }
 
 }  // namespace iwars

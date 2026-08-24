@@ -8,11 +8,12 @@
 
 namespace iwars {
 
+// BU: Strategy interface: turn the current entity list + sim time into a UDP datagram.
 class PacketEncoder {
  public:
-  virtual ~PacketEncoder() = default;
+  virtual ~PacketEncoder() = default;  // BU: Virtual dtor so unique_ptr<PacketEncoder> deletes the subclass.
   virtual std::vector<std::uint8_t> encode(const std::vector<Entity>& entities,
-                                           double sim_time_s) const = 0;
+                                           double sim_time_s) const = 0;  // BU: Produce wire bytes for one tick.
 };
 
 /** Placeholder radar-stim truth protocol (IWP2).
@@ -30,10 +31,11 @@ class PacketEncoder {
  *     heading_deg f64 BE, speed_mps f64 BE, climb_mps f64 BE
  *     iff_enabled u8, mode_c u8, mode_4 u8, mode_5 u8
  */
+// BU: Temporary IWP2 encoder used until the real radar-stim ICD is plugged in.
 class PlaceholderEncoder : public PacketEncoder {
  public:
   std::vector<std::uint8_t> encode(const std::vector<Entity>& entities,
-                                   double sim_time_s) const override;
+                                   double sim_time_s) const override;  // BU: Pack header + every entity into BE bytes.
 };
 
 }  // namespace iwars
