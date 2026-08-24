@@ -1,4 +1,4 @@
-# BU: Require a CMake new enough for C++20 targets and imported OpenSSL/Threads packages.
+# BU: Require a CMake new enough for C++20 targets and imported Threads packages.
 cmake_minimum_required(VERSION 3.20)
 # BU: Name the project and restrict it to C++ (no C/Fortran).
 project(iwars_sim LANGUAGES CXX)
@@ -10,8 +10,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # BU: Emit compile_commands.json for clangd / IDE indexing.
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# BU: OpenSSL is used by the WebSocket handshake (SHA-1 of the Sec-WebSocket-Key).
-find_package(OpenSSL REQUIRED)
 # BU: pthread / Win32 threads for the engine, HTTP, and WS worker threads.
 find_package(Threads REQUIRED)
 
@@ -26,16 +24,14 @@ add_executable(iwars_sim
   src/api/ws_server.cpp
 )
 
-# BU: Public headers live in include/; vendored httplib and nlohmann live in third_party/.
+# BU: Public headers live in include/; vendored httplib, nlohmann, and SHA-1 live in third_party/.
 target_include_directories(iwars_sim PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/include
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party
 )
 
-# BU: Link SSL/crypto for SHA-1 and the platform thread library.
+# BU: Platform thread library. SHA-1 is header-only (third_party/sha1.hpp); no OpenSSL.
 target_link_libraries(iwars_sim PRIVATE
-  OpenSSL::SSL
-  OpenSSL::Crypto
   Threads::Threads
 )
 
@@ -44,5 +40,6 @@ if(WIN32)
   target_link_libraries(iwars_sim PRIVATE ws2_32)
 endif()
 
-# BU: cpp-httplib is used as a plain HTTP server; do not pull OpenSSL into httplib itself.
-target_compile_definitions(iwars_sim PRIVATE CPPHTTPLIB_OPENSSL_SUPPORT=0)
+# BU: Do not define CPPHTTPLIB_OPENSSL_SUPPORT — httplib uses #ifdef, so =0 still
+# BU: pulls OpenSSL. Plain HTTP only; TLS is unused.
+

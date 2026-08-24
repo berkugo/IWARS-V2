@@ -1,6 +1,6 @@
 #include "iwars/api/server.hpp"
 
-#include <openssl/sha.h>
+#include <sha1.hpp>
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -39,9 +39,9 @@ std::string base64_encode(const unsigned char* data, std::size_t len) {
 std::string ws_accept_key(const std::string& client_key) {
   const std::string src =
       client_key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";  // BU: Concatenate key with the protocol GUID.
-  unsigned char hash[SHA_DIGEST_LENGTH];                    // BU: 20-byte SHA-1 digest.
-  SHA1(reinterpret_cast<const unsigned char*>(src.data()), src.size(), hash);  // BU: OpenSSL SHA-1.
-  return base64_encode(hash, SHA_DIGEST_LENGTH);            // BU: Handshake response value.
+  std::uint8_t hash[SHA1_DIGEST_LENGTH];                    // BU: 20-byte SHA-1 digest.
+  sha1(src.data(), src.size(), hash);                       // BU: Vendored SHA-1 (third_party/sha1.hpp).
+  return base64_encode(hash, SHA1_DIGEST_LENGTH);           // BU: Handshake response value.
 }
 
 // BU: Extract a HTTP header value (case-insensitive fallback) from the raw request text.
