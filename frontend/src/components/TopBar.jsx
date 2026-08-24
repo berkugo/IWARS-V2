@@ -103,10 +103,12 @@ export default function TopBar({
         )}
 
         <div className="ml-1 flex items-center gap-2">
-          <span className="live-badge">
-            <span className="h-1.5 w-1.5 rounded-full bg-white pulse" />
-            {connected ? 'LIVE' : 'OFF'}
-          </span>
+          <span
+            className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+              connected ? 'bg-emerald-500' : 'bg-red-500'
+            }`}
+            title={connected ? 'Live' : 'Offline'}
+          />
           {nav === 'simulation' && (
             <span
               className="text-xs text-[var(--muted)]"

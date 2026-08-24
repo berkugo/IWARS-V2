@@ -55,6 +55,33 @@ function finiteNum(v, fallback = 0) {
   return Number.isFinite(n) ? n : fallback
 }
 
+function NumField({ value, onCommit, step = 'any' }) {
+  const [text, setText] = useState(null)
+  const shown = text !== null ? text : value
+  return (
+    <input
+      type="number"
+      step={step}
+      className="stitch-input"
+      value={shown}
+      onChange={(e) => {
+        const raw = e.target.value
+        setText(raw)
+        if (raw === '' || raw === '-' || raw === '.' || raw === '-.') return
+        const n = Number(raw)
+        if (Number.isFinite(n)) onCommit(n)
+      }}
+      onBlur={() => {
+        if (text !== null) {
+          const n = Number(text)
+          onCommit(Number.isFinite(n) ? n : finiteNum(value))
+        }
+        setText(null)
+      }}
+    />
+  )
+}
+
 export default function TrackSidebar({
   entities,
   selectedId,
@@ -65,6 +92,7 @@ export default function TrackSidebar({
   readOnly = false,
   onClearRoute,
   onRemoveWaypoint,
+  scenarioKey = '',
 }) {
   const [tab, setTab] = useState('tracks')
   const [draft, setDraft] = useState(null)
@@ -73,6 +101,7 @@ export default function TrackSidebar({
   const draftRef = useRef(null)
   const flushTimer = useRef(null)
   const skipSyncUntil = useRef(0)
+  const flushGen = useRef(0)
 
   useEffect(() => {
     draftRef.current = draft
@@ -86,7 +115,7 @@ export default function TrackSidebar({
     const e = entities.find((x) => x.id === selectedId) || null
     setDraft(cloneEntity(e))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId])
+  }, [selectedId, scenarioKey])
 
   useEffect(() => {
     if (!selectedId || dirtyRef.current) return
@@ -97,6 +126,7 @@ export default function TrackSidebar({
 
   async function flushEntity(entity) {
     if (readOnly || !entity) return
+    const mine = ++flushGen.current
     const payload = {
       ...entity,
       lat: finiteNum(entity.lat),
@@ -118,6 +148,7 @@ export default function TrackSidebar({
     skipSyncUntil.current = Date.now() + 2000
     try {
       await onChange(payload)
+      if (mine !== flushGen.current) return
       draftRef.current = payload
       setDraft(cloneEntity(payload))
       dirtyRef.current = false
@@ -127,14 +158,12 @@ export default function TrackSidebar({
     }
   }
 
-  function scheduleFlush(entity, immediate = false) {
+  function scheduleFlush(entity) {
     if (flushTimer.current) clearTimeout(flushTimer.current)
-    const run = () => flushEntity(entity)
-    if (immediate) run()
-    else flushTimer.current = setTimeout(run, 250)
+    flushTimer.current = setTimeout(() => flushEntity(entity), 300)
   }
 
-  function patchDraft(field, value, immediate = false) {
+  function patchDraft(field, value) {
     if (readOnly) return
     dirtyRef.current = true
     setDirty(true)
@@ -158,8 +187,7 @@ export default function TrackSidebar({
       return next
     })
     if (nextEntity && (AUTO_FIELDS.has(field) || field === 'platform')) {
-      const asap = immediate || field === 'speed_mps' || field === 'climb_mps'
-      scheduleFlush(nextEntity, asap)
+      scheduleFlush(nextEntity)
     }
   }
 
@@ -415,22 +443,18 @@ export default function TrackSidebar({
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    ['lat', 'Lat', draft.lat, false],
-                    ['lon', 'Lon', draft.lon, false],
-                    ['alt_m', 'Alt m (MSL)', draft.alt_m ?? draft.alt ?? 0, false],
-                    ['heading_deg', 'Hdg °', draft.heading_deg, false],
-                  ].map(([key, label, val, locked]) => (
+                    ['lat', 'Lat', draft.lat],
+                    ['lon', 'Lon', draft.lon],
+                    ['alt_m', 'Alt m (MSL)', draft.alt_m ?? draft.alt ?? 0],
+                    ['heading_deg', 'Hdg °', draft.heading_deg],
+                  ].map(([key, label, val]) => (
                     <label key={key} className="block">
                       <span className="mb-1 block text-[10px] uppercase tracking-wider text-[var(--muted)]">
                         {label}
                       </span>
-                      <input
-                        type="number"
-                        step="any"
-                        className="stitch-input"
+                      <NumField
                         value={val}
-                        disabled={!!locked}
-                        onChange={(e) => patchDraft(key, finiteNum(e.target.value))}
+                        onCommit={(n) => patchDraft(key, n)}
                       />
                     </label>
                   ))}
@@ -438,28 +462,20 @@ export default function TrackSidebar({
                     <span className="mb-1 block text-[10px] uppercase tracking-wider text-[var(--muted)]">
                       Speed kt
                     </span>
-                    <input
-                      type="number"
+                    <NumField
                       step="1"
-                      className="stitch-input"
                       value={Math.round(mpsToKt(draft.speed_mps) * 10) / 10}
-                      onChange={(e) =>
-                        patchDraft('speed_mps', ktToMps(finiteNum(e.target.value)), true)
-                      }
+                      onCommit={(kt) => patchDraft('speed_mps', ktToMps(kt))}
                     />
                   </label>
                   <label className="block">
                     <span className="mb-1 block text-[10px] uppercase tracking-wider text-[var(--muted)]">
                       Climb m/s
                     </span>
-                    <input
-                      type="number"
+                    <NumField
                       step="0.1"
-                      className="stitch-input"
                       value={draft.climb_mps ?? 0}
-                      onChange={(e) =>
-                        patchDraft('climb_mps', finiteNum(e.target.value), true)
-                      }
+                      onCommit={(n) => patchDraft('climb_mps', n)}
                     />
                   </label>
                 </div>

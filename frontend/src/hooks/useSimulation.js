@@ -35,6 +35,15 @@ export function useSimulation() {
   const [scenarios, setScenarios] = useState([])
   const wsRef = useRef(null)
   const lastFp = useRef('')
+  const lastSeq = useRef(0)
+
+  function acceptSeq(data) {
+    const seq = Number(data?.seq)
+    if (!Number.isFinite(seq) || seq <= 0) return true
+    if (seq <= lastSeq.current) return false
+    lastSeq.current = seq
+    return true
+  }
 
   const refreshScenarios = useCallback(async () => {
     try {
@@ -58,6 +67,7 @@ export function useSimulation() {
         if (typeof h?.ws_port === 'number') wsPort = h.ws_port
         const s = await api.state()
         if (!cancelled) {
+          acceptSeq(s)
           setState((prev) => ({ ...prev, ...s }))
           lastFp.current = entitiesFingerprint(s.entities)
           setError(null)
@@ -70,6 +80,7 @@ export function useSimulation() {
     }
 
     function applyIncoming(data) {
+      if (!acceptSeq(data)) return
       setState((prev) => {
         const playing = !!data.playing
         if (!playing && !prev.playing) {
@@ -81,7 +92,6 @@ export function useSimulation() {
             prev.udp?.port === data.udp?.port &&
             !!prev.udp?.enabled === !!data.udp?.enabled
           ) {
-            // Heartbeat with no change — skip re-render
             if (prev.sim_time === data.sim_time) return prev
             return { ...prev, sim_time: data.sim_time, playing: false }
           }
@@ -146,6 +156,7 @@ export function useSimulation() {
   }, [refreshScenarios])
 
   const applyState = (data) => {
+    if (!acceptSeq(data)) return
     lastFp.current = entitiesFingerprint(data.entities)
     setState((prev) => ({ ...prev, ...data }))
   }
@@ -157,10 +168,22 @@ export function useSimulation() {
     scenarios,
     refreshScenarios,
     play: async () => {
-      await api.play()
+      setState((prev) => ({ ...prev, playing: true }))
+      try {
+        applyState(await api.play())
+      } catch (e) {
+        setState((prev) => ({ ...prev, playing: false }))
+        throw e
+      }
     },
     pause: async () => {
-      await api.pause()
+      setState((prev) => ({ ...prev, playing: false }))
+      try {
+        applyState(await api.pause())
+      } catch (e) {
+        setState((prev) => ({ ...prev, playing: true }))
+        throw e
+      }
     },
     reset: async () => {
       applyState(await api.reset())

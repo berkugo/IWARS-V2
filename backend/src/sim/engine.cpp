@@ -64,27 +64,58 @@ void Engine::stop() {
 }
 
 void Engine::play() {
-  playing_.store(true);  // BU: Arm kinematics integration.
-  bump_epoch();          // BU: Force an immediate UI push even before the next tick.
+  {
+    std::lock_guard lock(mu_);          // BU: Flip the arm under the same lock the loop uses to snapshot.
+    playing_.store(true);               // BU: Arm kinematics integration.
+    bump_epoch();                       // BU: Invalidate any in-flight paused heartbeat.
+  }
+  emit_state();                         // BU: Push immediately so the UI does not wait up to one tick.
 }
 
 void Engine::pause() {
-  playing_.store(false);  // BU: Freeze integration; loop still heartbeats.
-  bump_epoch();           // BU: Push the paused snapshot so the UI flips out of LIVE immediately.
+  {
+    std::lock_guard lock(mu_);          // BU: Same lock as snapshot so playing and epoch stay paired.
+    playing_.store(false);              // BU: Freeze integration; loop still heartbeats.
+    bump_epoch();                       // BU: Force a paused push even if a playing tick already ran.
+  }
+  emit_state();                         // BU: Push the paused flag before the next 1 Hz idle slot.
 }
 
 void Engine::reset() {
-  std::lock_guard lock(mu_);                      // BU: Mutate scenario_ under the engine lock.
-  scenario_.entities = initial_.entities;         // BU: Restore track list to the snapshot.
-  scenario_.meta = initial_.meta;                 // BU: Restore camera/name.
-  for (auto& e : scenario_.entities) e.route_index = 0;  // BU: Rewind every route to the first waypoint.
-  scenario_.ensure_ownship();                     // BU: Re-inject AEWC737 if the snapshot was odd.
-  sim_time_.store(0.0);                           // BU: Zero the simulation clock.
-  bump_epoch();                                   // BU: Notify the paused loop to push T+0.
+  {
+    std::lock_guard lock(mu_);                      // BU: Mutate scenario_ under the engine lock.
+    scenario_.entities = initial_.entities;         // BU: Restore track list to the snapshot.
+    scenario_.meta = initial_.meta;                 // BU: Restore camera/name.
+    for (auto& e : scenario_.entities) e.route_index = 0;  // BU: Rewind every route to the first waypoint.
+    scenario_.ensure_ownship();                     // BU: Re-inject AEWC737 if the snapshot was odd.
+    sim_time_.store(0.0);                           // BU: Zero the simulation clock.
+    bump_epoch();                                   // BU: Notify listeners that T+0 is live.
+  }
+  emit_state();                                     // BU: Push the restored picture immediately.
 }
 
 // BU: Relaxed add is enough: the loop only uses epoch inequality, not ordering.
 void Engine::bump_epoch() { epoch_.fetch_add(1, std::memory_order_relaxed); }
+
+std::uint64_t Engine::next_seq() const {
+  return seq_.fetch_add(1, std::memory_order_relaxed) + 1;  // BU: First snapshot is 1, then 2, …
+}
+
+void Engine::emit_state() {
+  StateCallback cb;                     // BU: Copy the callback so WS/UDP run without holding mu_.
+  nlohmann::json state;                 // BU: Snapshot JSON.
+  {
+    std::lock_guard lock(mu_);          // BU: Pair scenario bytes with the live playing flag.
+    state = scenario_.to_json();        // BU: Serialize live picture.
+    state["playing"] = playing_.load(); // BU: Current arm, not a flag captured before this lock.
+    state["sim_time"] = sim_time_.load();  // BU: Attach clock.
+    state["seq"] = next_seq();          // BU: Monotonic id for the UI.
+    last_pushed_epoch_.store(epoch_.load(std::memory_order_relaxed),
+                             std::memory_order_relaxed);  // BU: This epoch was actually sent.
+    cb = on_state_;                     // BU: Copy std::function.
+  }
+  if (cb) cb(state);                    // BU: Broadcast + maybe UDP (see main.cpp).
+}
 
 void Engine::set_state_callback(StateCallback cb) {
   std::lock_guard lock(mu_);   // BU: Callback is copied under the lock in loop() too.
@@ -96,6 +127,7 @@ nlohmann::json Engine::snapshot() const {
   auto j = scenario_.to_json();         // BU: Serialize meta, udp, entities.
   j["playing"] = playing_.load();       // BU: Attach playback arm for the UI.
   j["sim_time"] = sim_time_.load();     // BU: Attach simulation clock for T+ display.
+  j["seq"] = next_seq();                // BU: Same sequence space as WS pushes.
   return j;                             // BU: Return a detached JSON document.
 }
 
@@ -105,12 +137,15 @@ Scenario Engine::copy_scenario() const {
 }
 
 void Engine::replace_scenario(Scenario sc) {
-  std::lock_guard lock(mu_);     // BU: Swap the live picture atomically w.r.t. ticks.
-  sc.ensure_ownship();           // BU: Guarantee AEWC737 exists before we go live.
-  scenario_ = std::move(sc);     // BU: Become the new live scenario.
-  initial_ = scenario_;          // BU: Reset baseline matches the newly loaded file.
-  sim_time_.store(0.0);          // BU: New picture starts at T+0.
-  bump_epoch();                  // BU: Push to the UI immediately.
+  {
+    std::lock_guard lock(mu_);     // BU: Swap the live picture atomically w.r.t. ticks.
+    sc.ensure_ownship();           // BU: Guarantee AEWC737 exists before we go live.
+    scenario_ = std::move(sc);     // BU: Become the new live scenario.
+    initial_ = scenario_;          // BU: Reset baseline matches the newly loaded file.
+    sim_time_.store(0.0);          // BU: New picture starts at T+0.
+    bump_epoch();                  // BU: Mark the load so paused ticks cannot skip it.
+  }
+  emit_state();                    // BU: Push immediately so a paused editor sees the new file.
 }
 
 void Engine::set_udp(UdpConfig cfg) {
@@ -165,7 +200,6 @@ bool Engine::remove_entity(const std::string& id) {
 void Engine::loop() {
   using clock = std::chrono::steady_clock;  // BU: Monotonic clock so NTP steps do not stretch ticks.
   auto next = clock::now();                 // BU: Deadline of the current slot.
-  std::uint64_t last_epoch = 0;             // BU: Last epoch we already pushed while paused.
   int idle_ticks = 0;                       // BU: Counts paused ticks toward a 1 Hz heartbeat.
 
   while (running_.load()) {                 // BU: Exit when stop() clears the flag.
@@ -183,25 +217,16 @@ void Engine::loop() {
     bool should_push = playing;             // BU: Playing always publishes (UI + UDP).
     if (!playing) {                         // BU: When paused, throttle to mutations + ~1 Hz.
       ++idle_ticks;                         // BU: Count this idle slot.
-      if (ep != last_epoch || idle_ticks >= static_cast<int>(tick_hz_)) {  // BU: Mutated or ~1 s elapsed.
+      if (ep != last_pushed_epoch_.load(std::memory_order_relaxed) ||
+          idle_ticks >= static_cast<int>(tick_hz_)) {  // BU: Unsent mutation or ~1 s.
         should_push = true;                 // BU: Time to heartbeat the UI.
         idle_ticks = 0;                     // BU: Restart the idle counter.
       }
+    } else {
+      idle_ticks = 0;                       // BU: Playing ticks are not idle.
     }
 
-    if (should_push) {                      // BU: Build a snapshot and invoke the callback outside the lock.
-      last_epoch = ep;                      // BU: Remember we already pushed this epoch.
-      StateCallback cb;                     // BU: Copy the callback so we can call it after unlocking.
-      nlohmann::json state;                 // BU: Snapshot JSON.
-      {
-        std::lock_guard lock(mu_);          // BU: Brief lock to copy scenario + callback.
-        state = scenario_.to_json();        // BU: Serialize live picture.
-        state["playing"] = playing;         // BU: Attach playback flag.
-        state["sim_time"] = sim_time_.load();  // BU: Attach clock.
-        cb = on_state_;                     // BU: Copy std::function so WS/UDP can run without holding mu_.
-      }
-      if (cb) cb(state);                    // BU: Broadcast + maybe UDP (see main.cpp).
-    }
+    if (should_push) emit_state();          // BU: Serialize under lock so playing/epoch cannot tear.
 
     std::this_thread::sleep_until(next);    // BU: Sleep until the next 10 Hz slot (catches up if we ran long).
   }

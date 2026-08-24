@@ -84,14 +84,14 @@ void HttpServer::start() {
              [&](const httplib::Request& req, httplib::Response& res) {
                cors(req, res);                                         // BU: CORS.
                engine_.play();                                         // BU: Start integrating kinematics.
-               res.set_content(R"({"playing":true})", "application/json");  // BU: Confirm playing.
+               res.set_content(engine_.snapshot().dump(), "application/json");  // BU: Full picture so the UI does not wait on WS.
              });
 
     svr.Post("/api/control/pause",                                     // BU: Freeze kinematics.
              [&](const httplib::Request& req, httplib::Response& res) {
                cors(req, res);                                         // BU: CORS.
                engine_.pause();                                        // BU: Stop integrating; clock holds.
-               res.set_content(R"({"playing":false})", "application/json");  // BU: Confirm paused.
+               res.set_content(engine_.snapshot().dump(), "application/json");  // BU: Full picture so the UI does not wait on WS.
              });
 
     svr.Post("/api/control/reset",                                     // BU: Restore baseline entities and T=0.

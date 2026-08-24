@@ -3,6 +3,7 @@
 #include "iwars/sim/scenario.hpp"
 
 #include <atomic>
+#include <cstdint>
 #include <functional>
 #include <mutex>
 #include <string>
@@ -25,15 +26,15 @@ class Engine {
   void start();  // BU: Spawn the tick thread and snapshot the initial scenario for reset().
   void stop();   // BU: Request the loop to exit and join the worker.
 
-  void play();   // BU: Arm integration so entities start moving.
-  void pause();  // BU: Freeze integration; UI still receives heartbeats.
+  void play();   // BU: Arm integration so entities start moving; push immediately.
+  void pause();  // BU: Freeze integration and push so the UI does not wait for a heartbeat.
   void reset();  // BU: Restore entities/meta from the snapshot taken at start/replace.
 
   bool running() const { return running_.load(); }     // BU: True while the worker thread is alive.
   bool playing() const { return playing_.load(); }     // BU: True while kinematics are being integrated.
   double sim_time() const { return sim_time_.load(); } // BU: Elapsed simulation seconds since last reset.
 
-  nlohmann::json snapshot() const;          // BU: Locked copy of scenario JSON plus playing/sim_time.
+  nlohmann::json snapshot() const;          // BU: Locked copy of scenario JSON plus playing/sim_time/seq.
   Scenario copy_scenario() const;           // BU: Locked deep copy of the live scenario.
   void replace_scenario(Scenario sc);       // BU: Swap in a new scenario, ensure ownship, reset time.
   void set_udp(UdpConfig cfg);              // BU: Update the scenario's UDP block without replacing entities.
@@ -49,6 +50,8 @@ class Engine {
   void tick(double dt);                 // BU: Integrate every entity by dt seconds under the mutex.
   void advance_entity(Entity& e, double dt);  // BU: Steer along route or dead-reckon heading/speed/climb.
   void bump_epoch();                    // BU: Increment the mutation counter so a paused loop still pushes.
+  void emit_state();                    // BU: Snapshot under lock (fresh playing + seq) and invoke on_state_.
+  std::uint64_t next_seq() const;       // BU: Monotonic id so the UI can drop stale WS/HTTP snapshots.
 
   double tick_hz_;                      // BU: Configured ticks per second.
   double tick_period_;                  // BU: Seconds per tick (1 / tick_hz_).
@@ -56,6 +59,8 @@ class Engine {
   std::atomic<bool> playing_{false};    // BU: Integration arm.
   std::atomic<double> sim_time_{0.0};   // BU: Simulation clock in seconds.
   std::atomic<std::uint64_t> epoch_{1}; // BU: Bumped on any mutation so paused UI still refreshes.
+  mutable std::atomic<std::uint64_t> seq_{0};  // BU: Incremented on every snapshot/push (HTTP + WS).
+  std::atomic<std::uint64_t> last_pushed_epoch_{0};  // BU: Last epoch actually serialized (not merely observed).
   mutable std::mutex mu_;               // BU: Guards scenario_, initial_, and on_state_.
   Scenario scenario_;                   // BU: Live picture the tick loop mutates.
   Scenario initial_;                    // BU: Snapshot used by reset().

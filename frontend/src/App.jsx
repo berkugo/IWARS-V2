@@ -220,6 +220,7 @@ export default function App() {
             readOnly={!isEditor}
             onClearRoute={handleClearRoute}
             onRemoveWaypoint={handleRemoveWaypoint}
+            scenarioKey={scenarioKey}
           />
 
           <main className="relative min-w-0 flex-1">
