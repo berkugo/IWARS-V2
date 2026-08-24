@@ -18,9 +18,9 @@
   --unknown: #ffb020;
   --text: #e6eef6;
   --muted: #7f91a4;
-  --font-ui: "Barlow", system-ui, sans-serif;
-  --font-display: "Barlow Condensed", "Barlow", sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-ui: system-ui, "Segoe UI", sans-serif;
+  --font-display: system-ui, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
 }
 
 * {
@@ -76,10 +76,6 @@ body,
   height: 100%;
   background: #02060a;
   font: inherit;
-}
-
-.leaflet-tile-pane {
-  filter: brightness(1.75) contrast(1.55) saturate(0.85);
 }
 
 .leaflet-control-attribution {

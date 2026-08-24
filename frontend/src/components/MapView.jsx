@@ -1,7 +1,6 @@
 import { Fragment, memo, useEffect, useMemo, useRef, useState } from 'react'
 import {
   MapContainer,
-  TileLayer,
   Marker,
   Polyline,
   CircleMarker,
@@ -218,19 +217,13 @@ function MapView({
     <MapContainer
       center={mapCenter}
       zoom={zoom ?? 6}
+      minZoom={2}
+      maxZoom={12}
       className="h-full w-full"
       zoomControl={false}
       preferCanvas
     >
       <ZoomControl position="bottomright" />
-      <TileLayer
-        url="https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png"
-        subdomains="abcd"
-        maxZoom={20}
-        attribution=""
-        crossOrigin="anonymous"
-        opacity={1}
-      />
       <CountryBorders />
       <MapSync center={mapCenter} zoom={zoom} scenarioKey={scenarioKey} />
       {!readOnly && <MapClick onMapClick={onMapClick} />}
