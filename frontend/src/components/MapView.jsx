@@ -207,6 +207,7 @@ function MapView({
   selectedId,
   scenarioKey,
   readOnly = false,
+  cursor = 'default',
   onSelect,
   onMapClick,
   onDragEntity,
@@ -222,7 +223,7 @@ function MapView({
       zoom={zoom ?? 6}
       minZoom={2}
       maxZoom={12}
-      className="h-full w-full"
+      className={`h-full w-full ${cursor === 'place' ? 'map-cursor-place' : ''}`}
       zoomControl={false}
       preferCanvas
     >

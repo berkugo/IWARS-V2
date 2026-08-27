@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MapView from './components/MapView'
 import TopBar from './components/TopBar'
 import TrackSidebar from './components/TrackSidebar'
@@ -26,6 +26,14 @@ export default function App() {
   const [scenarioName, setScenarioName] = useState('untitled')
   const [nav, setNav] = useState('simulation')
   const [tool, setTool] = useState('select')
+  const [toast, setToast] = useState(null)
+  const toastTimer = useRef(null)
+
+  const flash = useCallback((msg) => {
+    setToast(msg)
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(null), 2200)
+  }, [])
 
   const entities = sim.state.entities || []
   const selected = entities.find((e) => e.id === selectedId)
@@ -91,8 +99,9 @@ export default function App() {
     async (id) => {
       await sim.removeEntity(id)
       setSelectedId((cur) => (cur === id ? null : cur))
+      flash('Track deleted')
     },
-    [sim],
+    [sim, flash],
   )
 
   const handleClearRoute = useCallback(
@@ -121,9 +130,11 @@ export default function App() {
     await sim.replaceScenario({ ...sim.state, name: scenarioLabel })
     await sim.saveScenario(name, scenarioLabel)
     setSaveName(name)
-  }, [saveName, scenarioName, sim])
+    flash(`Saved ${name}`)
+  }, [saveName, scenarioName, sim, flash])
 
   const handleNew = useCallback(async () => {
+    if (!window.confirm('Start a blank scenario? Unsaved map edits will be lost.')) return
     await sim.pause()
     const centerLat = 39.9334
     const centerLon = 32.8597
@@ -140,15 +151,17 @@ export default function App() {
     setScenarioName('untitled')
     setSaveName('untitled.json')
     setTool('add_track')
-  }, [sim])
+    flash('New scenario')
+  }, [sim, flash])
 
   const handleLoad = useCallback(
     async (filename) => {
       await sim.loadScenario(filename)
       setSaveName(filename)
       setTool('select')
+      flash(`Loaded ${filename}`)
     },
-    [sim],
+    [sim, flash],
   )
 
   const handleNav = useCallback(
@@ -164,6 +177,35 @@ export default function App() {
       setSelectedId(entities[0].id)
     }
   }, [entities, selectedId])
+
+  useEffect(() => {
+    function onKey(e) {
+      const el = e.target
+      const typing =
+        el instanceof HTMLElement &&
+        (el.tagName === 'INPUT' ||
+          el.tagName === 'TEXTAREA' ||
+          el.tagName === 'SELECT' ||
+          el.isContentEditable)
+      if (e.key === 'Escape') {
+        setTool('select')
+        return
+      }
+      if (typing) return
+      if (e.key === ' ' && nav === 'simulation') {
+        e.preventDefault()
+        if (sim.state.playing) sim.pause()
+        else sim.play()
+        return
+      }
+      if (nav !== 'editor') return
+      if (e.key === '1') setTool('select')
+      if (e.key === '2') setTool('add_track')
+      if (e.key === '3') setTool('add_waypoint')
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [nav, sim])
 
   return (
     <div className="flex h-full flex-col bg-[var(--bg-deep)]">
@@ -231,6 +273,11 @@ export default function App() {
               selectedId={selectedId}
               scenarioKey={scenarioKey}
               readOnly={!isEditor}
+              cursor={
+                isEditor && (tool === 'add_track' || tool === 'add_waypoint')
+                  ? 'place'
+                  : 'default'
+              }
               onSelect={(id) => {
                 setSelectedId(id)
                 if (isEditor && tool === 'add_track') setTool('select')
@@ -249,10 +296,23 @@ export default function App() {
         </div>
       )}
 
+      {toast && <div className="app-toast">{toast}</div>}
+
       <footer className="flex h-8 shrink-0 items-center gap-4 border-t border-[var(--line)] bg-[var(--bg-panel)] px-4 text-[10px] text-[var(--muted)]">
-        <span style={{ fontFamily: 'var(--font-mono)' }}>IWARS v2</span>
+        <span style={{ fontFamily: 'var(--font-mono)' }}>
+          {sim.state.name || 'untitled'} · {entities.length} tracks
+        </span>
+        <span style={{ fontFamily: 'var(--font-mono)' }}>
+          {nav === 'simulation'
+            ? sim.state.playing
+              ? 'PLAYING'
+              : 'PAUSED'
+            : nav === 'editor'
+              ? 'EDITOR'
+              : 'UDP'}
+        </span>
         <span className="ml-auto" style={{ fontFamily: 'var(--font-mono)' }}>
-          ENTITY TRUTH FEED · AIR C4ISR · UDP OUTBOUND
+          {nav === 'editor' ? 'Esc select · 1/2/3 tools' : 'Space play/pause'}
         </span>
       </footer>
     </div>

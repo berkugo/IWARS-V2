@@ -13,11 +13,6 @@ import {
 
 const TRACK_PLATFORMS = PLATFORMS.filter((p) => p.id !== 'aircraft')
 
-const TABS = [
-  { id: 'tracks', label: 'Air Tracks', icon: '▣' },
-  { id: 'logs', label: 'Logs', icon: '☰' },
-]
-
 const AUTO_FIELDS = new Set([
   'lat',
   'lon',
@@ -94,9 +89,9 @@ export default function TrackSidebar({
   onRemoveWaypoint,
   scenarioKey = '',
 }) {
-  const [tab, setTab] = useState('tracks')
   const [draft, setDraft] = useState(null)
   const [dirty, setDirty] = useState(false)
+  const [filter, setFilter] = useState('')
   const dirtyRef = useRef(false)
   const draftRef = useRef(null)
   const flushTimer = useRef(null)
@@ -206,70 +201,72 @@ export default function TrackSidebar({
     return e.affiliation || e.side || 'unknown'
   }
 
+  const q = filter.trim().toLowerCase()
+  const visible = q
+    ? entities.filter((e) => {
+        const blob = `${e.name || ''} ${e.id} ${e.platform || ''} ${e.affiliation || ''}`.toLowerCase()
+        return blob.includes(q)
+      })
+    : entities
+
   return (
     <aside className="flex h-full w-[300px] shrink-0 flex-col border-r border-[var(--line)] bg-[var(--bg-panel)]">
       <div className="border-b border-[var(--line)] px-3 py-3">
-        <div
-          className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]"
-          style={{ fontFamily: 'var(--font-display)' }}
-        >
-          {editorMode ? 'Tracks in scenario' : 'Live tracks'}
-        </div>
-        {editorMode ? (
-          <p className="mt-1 text-[10px] leading-relaxed text-[var(--muted)]">
-            Use Place Track / Place Waypoint in the editor panel.
-          </p>
-        ) : (
-          <p className="mt-1 text-[10px] leading-relaxed text-[var(--muted)]">
-            Read-only run view — Play / Pause / Reset only.
-          </p>
-        )}
-      </div>
-
-      <div className="flex border-b border-[var(--line)]">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className={`side-tab ${tab === t.id ? 'active' : ''}`}
-            onClick={() => setTab(t.id)}
+        <div className="flex items-baseline justify-between gap-2">
+          <div
+            className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]"
+            style={{ fontFamily: 'var(--font-display)' }}
           >
-            <span className="text-sm leading-none">{t.icon}</span>
-            {t.label}
-          </button>
-        ))}
+            {editorMode ? 'Tracks in scenario' : 'Live tracks'}
+          </div>
+          <div className="text-[10px] text-[var(--muted)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            {entities.length}
+          </div>
+        </div>
+        <p className="mt-1 text-[10px] leading-relaxed text-[var(--muted)]">
+          {editorMode
+            ? 'Place Track / Place Waypoint, or keys 1 2 3.'
+            : 'Read-only. Space plays or pauses.'}
+        </p>
+        <input
+          className="stitch-input mt-2"
+          placeholder="Filter callsign…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
       </div>
 
-      {tab === 'logs' ? (
-        <div className="flex flex-1 items-center justify-center p-6 text-center text-xs text-[var(--muted)]">
-          Logs — UDP publish / air picture events (soon)
-        </div>
-      ) : (
-        <>
-          <ul className="max-h-[38%] space-y-1.5 overflow-y-auto p-2">
-            {entities.length === 0 && (
-              <li className="px-2 py-8 text-center text-xs text-[var(--muted)]">
-                {editorMode
-                  ? 'No air tracks — use Place Track, then click the map'
-                  : 'No air tracks in this scenario'}
-              </li>
-            )}
-            {entities.map((e) => {
-              const aff = affOf(e)
-              const isSelected = e.id === selectedId
-              const hostile = aff === 'hostile' || aff === 'red'
-              const own = isOwnship(e)
-              const fl = altToFL(e.alt_m ?? e.alt)
-              const kt = Math.round(mpsToKt(e.speed_mps))
-              return (
-                <li key={e.id}>
-                  <button
-                    type="button"
-                    onClick={() => onSelect(e.id)}
-                    className={`track-card ${
-                      isSelected ? (hostile ? 'selected-hostile' : 'selected') : ''
-                    }`}
-                  >
+      <ul className="max-h-[38%] space-y-1.5 overflow-y-auto p-2">
+        {visible.length === 0 && (
+          <li className="px-2 py-8 text-center text-xs text-[var(--muted)]">
+            {entities.length === 0
+              ? editorMode
+                ? 'No air tracks — Place Track, then click the map'
+                : 'No air tracks in this scenario'
+              : 'No match'}
+          </li>
+        )}
+        {visible.map((e) => {
+          const aff = affOf(e)
+          const isSelected = e.id === selectedId
+          const hostile = aff === 'hostile' || aff === 'red'
+          const own = isOwnship(e)
+          const fl = altToFL(e.alt_m ?? e.alt)
+          const kt = Math.round(mpsToKt(e.speed_mps))
+          const selClass = isSelected
+            ? own
+              ? 'selected-ownship'
+              : hostile
+                ? 'selected-hostile'
+                : 'selected'
+            : ''
+          return (
+            <li key={e.id}>
+              <button
+                type="button"
+                onClick={() => onSelect(e.id)}
+                className={`track-card ${selClass}`}
+              >
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate text-sm font-semibold tracking-wide">
                         {e.name || e.id}
@@ -287,7 +284,7 @@ export default function TrackSidebar({
                         FL
                         <span className="text-[var(--text)]">{String(fl).padStart(3, '0')}</span>
                       </span>
-                      {own && kt < 1 ? (
+                      {kt < 1 ? (
                         <span className="text-[var(--accent)]">STATIC</span>
                       ) : (
                         <span>
@@ -643,7 +640,10 @@ export default function TrackSidebar({
                     <button
                       type="button"
                       className="w-full border border-[rgba(255,77,94,0.35)] py-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--hostile)]"
-                      onClick={() => onDelete(draft.id)}
+                      onClick={() => {
+                        const label = draft.name || draft.id
+                        if (window.confirm(`Delete track ${label}?`)) onDelete(draft.id)
+                      }}
                     >
                       Delete track
                     </button>
@@ -652,8 +652,6 @@ export default function TrackSidebar({
               </div>
             )}
           </div>
-        </>
-      )}
     </aside>
   )
 }

@@ -88,8 +88,16 @@ body,
   overflow: hidden;
   box-shadow: none !important;
   margin: 14px !important;
-  margin-bottom: 72px !important; /* clear active-track readout */
+  margin-bottom: 118px !important;
   z-index: 600 !important;
+}
+
+.leaflet-container.map-cursor-place {
+  cursor: crosshair !important;
+}
+
+.leaflet-container.map-cursor-place .leaflet-interactive {
+  cursor: crosshair !important;
 }
 
 .leaflet-control-zoom a {
@@ -126,6 +134,20 @@ body,
 
 .stitch-input:focus {
   border-color: var(--accent);
+}
+
+.stitch-input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.icon-btn:focus-visible,
+.nav-link:focus-visible,
+.btn-update:focus-visible,
+.side-tab:focus-visible,
+.track-card:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .stitch-select {
@@ -356,4 +378,27 @@ body,
   border-color: var(--hostile);
   background: rgba(255, 77, 94, 0.08);
   box-shadow: inset 3px 0 0 var(--hostile);
+}
+
+.track-card.selected-ownship {
+  border-color: var(--accent);
+  background: rgba(0, 229, 192, 0.08);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.app-toast {
+  position: fixed;
+  bottom: 2.5rem;
+  left: 50%;
+  z-index: 900;
+  transform: translateX(-50%);
+  pointer-events: none;
+  border: 1px solid var(--accent);
+  background: rgba(6, 10, 15, 0.94);
+  color: var(--accent);
+  padding: 0.45rem 0.9rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }

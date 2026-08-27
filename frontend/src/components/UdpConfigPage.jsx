@@ -1,5 +1,33 @@
+import { useEffect, useRef, useState } from 'react'
+
 export default function UdpConfigPage({ udp, onUdpChange, connected }) {
   const cfg = udp || { host: '127.0.0.1', port: 9000, enabled: false }
+  const [host, setHost] = useState(cfg.host)
+  const [port, setPort] = useState(String(cfg.port))
+  const timer = useRef(null)
+
+  useEffect(() => {
+    setHost(cfg.host)
+    setPort(String(cfg.port))
+  }, [cfg.host, cfg.port])
+
+  function push(next) {
+    onUdpChange(next)
+  }
+
+  function schedule(nextHost, nextPort) {
+    if (timer.current) clearTimeout(timer.current)
+    timer.current = setTimeout(() => {
+      const n = Number(nextPort)
+      push({
+        ...cfg,
+        host: nextHost.trim() || '127.0.0.1',
+        port: Number.isFinite(n) && n > 0 ? n : 9000,
+      })
+    }, 350)
+  }
+
+  useEffect(() => () => clearTimeout(timer.current), [])
 
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center bg-[var(--bg-deep)] p-8">
@@ -17,8 +45,9 @@ export default function UdpConfigPage({ udp, onUdpChange, connected }) {
           Outbound feed target
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">
-          Entity truth packets are sent here. Radar / IFF blips are produced by the
-          workplace simulator — not by IWARS v2.
+          Truth datagrams go here while the scenario is playing. Radar / IFF blips
+          are produced by the workplace simulator — not by IWARS. Packet layout is
+          the IWP2 placeholder until the DSS encoder is swapped in.
         </p>
 
         <div className="mt-6 space-y-4">
@@ -28,7 +57,7 @@ export default function UdpConfigPage({ udp, onUdpChange, connected }) {
               type="checkbox"
               className="h-4 w-4 accent-[var(--accent)]"
               checked={!!cfg.enabled}
-              onChange={(e) => onUdpChange({ ...cfg, enabled: e.target.checked })}
+              onChange={(e) => push({ ...cfg, enabled: e.target.checked })}
             />
           </label>
 
@@ -38,8 +67,11 @@ export default function UdpConfigPage({ udp, onUdpChange, connected }) {
             </span>
             <input
               className="stitch-input"
-              value={cfg.host}
-              onChange={(e) => onUdpChange({ ...cfg, host: e.target.value })}
+              value={host}
+              onChange={(e) => {
+                setHost(e.target.value)
+                schedule(e.target.value, port)
+              }}
               placeholder="127.0.0.1"
             />
           </label>
@@ -51,8 +83,11 @@ export default function UdpConfigPage({ udp, onUdpChange, connected }) {
             <input
               type="number"
               className="stitch-input"
-              value={cfg.port}
-              onChange={(e) => onUdpChange({ ...cfg, port: Number(e.target.value) })}
+              value={port}
+              onChange={(e) => {
+                setPort(e.target.value)
+                schedule(host, e.target.value)
+              }}
               placeholder="9000"
             />
           </label>
@@ -76,9 +111,9 @@ export default function UdpConfigPage({ udp, onUdpChange, connected }) {
           className="mt-2 text-[11px] text-[var(--muted)]"
           style={{ fontFamily: 'var(--font-mono)' }}
         >
-          WS:{' '}
-          <span className={connected ? 'text-[var(--accent)]' : 'text-[var(--hostile)]'}>
-            {connected ? 'LIVE' : 'OFFLINE'}
+          Backend:{' '}
+          <span className={connected ? 'text-emerald-400' : 'text-[var(--hostile)]'}>
+            {connected ? 'connected' : 'offline'}
           </span>
         </div>
       </div>

@@ -2,17 +2,20 @@ const TOOLS = [
   {
     id: 'select',
     label: 'Select',
+    key: '1',
     hint: 'Select tracks on the map or list',
   },
   {
     id: 'add_track',
     label: 'Place Track',
+    key: '2',
     hint: 'Click the map to add an air track',
   },
   {
     id: 'add_waypoint',
     label: 'Place Waypoint',
-    hint: 'Select a track, then click the map to append route waypoints',
+    key: '3',
+    hint: 'Select a track, then click the map to append waypoints',
   },
 ]
 
@@ -34,6 +37,7 @@ export default function ScenarioEditorPanel({
     (n, e) => n + (e.route || []).length,
     0,
   )
+  const files = [...(scenarios || [])].sort((a, b) => a.localeCompare(b))
 
   return (
     <div className="flex w-72 shrink-0 flex-col border-r border-[var(--line)] bg-[var(--bg-panel)]">
@@ -45,8 +49,7 @@ export default function ScenarioEditorPanel({
           Scenario Editor
         </div>
         <p className="mt-1 text-xs leading-relaxed text-[var(--muted)]">
-          Create a scenario, place air tracks, then draw waypoints. Run it from
-          Simulation.
+          Place tracks, draw routes, save. Run from Simulation.
         </p>
       </div>
 
@@ -100,18 +103,24 @@ export default function ScenarioEditorPanel({
               key={t.id}
               type="button"
               onClick={() => setTool(t.id)}
-              className={`w-full border px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-wider ${
+              className={`flex w-full items-center justify-between border px-2 py-2 text-left text-[11px] font-semibold uppercase tracking-wider ${
                 tool === t.id
                   ? 'border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent)]'
                   : 'border-[var(--line)] text-[var(--muted)] hover:text-[var(--text)]'
               }`}
             >
-              {t.label}
+              <span>{t.label}</span>
+              <span
+                className="text-[10px] font-normal tracking-normal opacity-70"
+                style={{ fontFamily: 'var(--font-mono)' }}
+              >
+                {t.key}
+              </span>
             </button>
           ))}
         </div>
         <p className="text-[10px] leading-relaxed text-[var(--muted)]">
-          {TOOLS.find((t) => t.id === tool)?.hint}
+          {TOOLS.find((t) => t.id === tool)?.hint} Esc returns to Select.
         </p>
         <div
           className="text-[10px] text-[var(--muted)]"
@@ -128,19 +137,29 @@ export default function ScenarioEditorPanel({
         >
           Saved files
         </div>
-        {scenarios.length === 0 && (
+        {files.length === 0 && (
           <p className="px-2 py-6 text-center text-xs text-[var(--muted)]">
             No saved scenarios yet
           </p>
         )}
         <ul className="space-y-1">
-          {scenarios.map((f) => {
-            const active = state.name && f.startsWith(state.name)
+          {files.map((f) => {
+            const stem = f.replace(/\.json$/i, '')
+            const active = f === saveName || stem === state.name
             return (
               <li key={f}>
                 <button
                   type="button"
-                  onClick={() => onLoad(f)}
+                  title={`Load ${f}`}
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        `Load ${f}? Unsaved editor changes will be replaced.`,
+                      )
+                    ) {
+                      onLoad(f)
+                    }
+                  }}
                   className={`w-full truncate rounded-sm border px-2 py-2 text-left text-xs ${
                     active
                       ? 'border-[var(--accent)] bg-[var(--accent-dim)] text-[var(--accent)]'

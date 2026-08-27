@@ -41,6 +41,7 @@ export default function TopBar({
 }) {
   const udp = state.udp || { host: '127.0.0.1', port: 9000, enabled: false }
   const t = Number(state.sim_time || 0).toFixed(1)
+  const playing = !!state.playing
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-4 border-b border-[var(--line)] bg-[var(--bg-panel)] px-4">
@@ -75,7 +76,7 @@ export default function TopBar({
             className={`h-2 w-2 rounded-full ${udp.enabled ? 'bg-[var(--accent)] pulse' : 'bg-[var(--muted)]'}`}
           />
           <span className="text-[var(--muted)]">
-            UDP:{' '}
+            UDP{' '}
             <span className="text-[var(--text)]">
               {udp.host}:{udp.port}
             </span>{' '}
@@ -90,15 +91,23 @@ export default function TopBar({
             <div className="mx-1 h-5 w-px bg-[var(--line)]" />
             <button
               type="button"
-              className={`icon-btn ${state.playing ? 'active' : ''}`}
-              title={state.playing ? 'Pause' : 'Play'}
-              onClick={state.playing ? onPause : onPlay}
+              className={`icon-btn ${playing ? 'active' : ''}`}
+              title={playing ? 'Pause (Space)' : 'Play (Space)'}
+              onClick={playing ? onPause : onPlay}
             >
-              {state.playing ? <IconPause /> : <IconPlay />}
+              {playing ? <IconPause /> : <IconPlay />}
             </button>
-            <button type="button" className="icon-btn" title="Reset" onClick={onReset}>
+            <button type="button" className="icon-btn" title="Reset to scenario start" onClick={onReset}>
               <IconReset />
             </button>
+            <span
+              className={`hidden text-[10px] font-semibold uppercase tracking-wider sm:inline ${
+                playing ? 'text-[var(--accent)]' : 'text-[var(--muted)]'
+              }`}
+              style={{ fontFamily: 'var(--font-mono)' }}
+            >
+              {playing ? 'PLAYING' : 'PAUSED'}
+            </span>
           </>
         )}
 
@@ -107,7 +116,7 @@ export default function TopBar({
             className={`h-2.5 w-2.5 shrink-0 rounded-full ${
               connected ? 'bg-emerald-500' : 'bg-red-500'
             }`}
-            title={connected ? 'Live' : 'Offline'}
+            title={connected ? 'Backend connected' : 'Backend offline'}
           />
           {nav === 'simulation' && (
             <span
