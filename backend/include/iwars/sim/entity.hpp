@@ -50,7 +50,7 @@ struct Entity {
   bool ownship{false};             // BU: True for the fixed AEW ownship (AEWC737).
 
   std::vector<Waypoint> route;     // BU: Optional waypoint list the engine steers toward.
-  std::size_t route_index{0};      // BU: Index of the next waypoint to fly to.
+  std::size_t route_index{0};      // BU: Next waypoint; wraps to 0 after the last so the route loops.
 
   // Legacy aliases kept in JSON for older scenarios
   // side -> affiliation, entity_type -> platform, alt -> alt_m

@@ -236,7 +236,8 @@ const EntityLayer = memo(function EntityLayer({
 
   const linePositions = useMemo(() => {
     if (route.length === 0) return null
-    return [[e.lat, e.lon], ...route]
+    const loop = route.length >= 2 ? [...route, route[0]] : route
+    return [[e.lat, e.lon], ...loop]
   }, [route, e.lat, e.lon])
 
   const wpIcons = useMemo(

@@ -241,15 +241,15 @@ void Engine::tick(double dt) {
 }
 
 void Engine::advance_entity(Entity& e, double dt) {
-  if (!e.route.empty() && e.route_index < e.route.size()) {  // BU: Still have an unfinished waypoint.
-    const auto& wp = e.route[e.route_index];                 // BU: Current target waypoint.
+  if (!e.route.empty()) {                                        // BU: A route is a closed loop — never drop off the end.
+    if (e.route_index >= e.route.size()) e.route_index = 0;      // BU: Stale index from an older snapshot.
+    const auto& wp = e.route[e.route_index];                     // BU: Current target waypoint.
     const double dist = haversine_m(e.lat, e.lon, wp.lat, wp.lon);  // BU: Meters remaining to the waypoint.
     e.heading_deg = bearing_deg(e.lat, e.lon, wp.lat, wp.lon);      // BU: Point the nose at the waypoint.
     if (dist < std::max(2.0, e.speed_mps * dt * 1.5)) {      // BU: Close enough this tick (2 m floor or 1.5*step).
       e.lat = wp.lat;                                        // BU: Snap onto the waypoint.
       e.lon = wp.lon;                                        // BU: Snap onto the waypoint.
-      ++e.route_index;                                       // BU: Advance to the next vertex.
-      // BU: Do not zero speed when the route ends — keep dead-reckoning on last heading.
+      e.route_index = (e.route_index + 1) % e.route.size();  // BU: Next vertex, or wrap to WP1.
       return;                                                // BU: Do not also dead-reckon this same dt.
     }
   }

@@ -48,7 +48,7 @@ class Engine {
  private:
   void loop();                          // BU: Timed 10 Hz loop: tick, maybe push state, sleep until next slot.
   void tick(double dt);                 // BU: Integrate every entity by dt seconds under the mutex.
-  void advance_entity(Entity& e, double dt);  // BU: Steer along route or dead-reckon heading/speed/climb.
+  void advance_entity(Entity& e, double dt);  // BU: Steer a looping waypoint route or dead-reckon heading/speed/climb.
   void bump_epoch();                    // BU: Increment the mutation counter so a paused loop still pushes.
   void emit_state();                    // BU: Snapshot under lock (fresh playing + seq) and invoke on_state_.
   std::uint64_t next_seq() const;       // BU: Monotonic id so the UI can drop stale WS/HTTP snapshots.
