@@ -28,7 +28,11 @@ class PacketEncoder {
  *   Entity-truth publisher. The engine already has lat/lon/alt, heading,
  *   ground speed (m/s), climb (m/s), affiliation, platform, IFF flags,
  *   Mode 3/A squawk, callsign, ownship flag. See Entity in entity.hpp.
- *   At 10 Hz while PLAYING, main.cpp calls UdpSender::send(entities, sim_time).
+ *   At 10 Hz while PLAYING, main.cpp calls UdpSender::send(entities, sim_time)
+ *   which emits TWO localhost datagrams:
+ *     entity_port   — all tracks except ownship (Entity Truth Data)
+ *     ownship_port  — AEWC737 only (Ownship Truth Data)
+ *   Host is always 127.0.0.1 for now.
  *
  * What to change (minimal set):
  *   1. THIS FILE + packet_encoder.cpp

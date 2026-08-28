@@ -4,10 +4,10 @@ import { api, wsUrl } from '../api'
 const emptyState = {
   name: 'untitled',
   description: '',
-  center_lat: 39.9334,
-  center_lon: 32.8597,
-  zoom: 11,
-  udp: { host: '127.0.0.1', port: 9000, enabled: false },
+  center_lat: 38.9637,
+  center_lon: 35.2433,
+  zoom: 6,
+  udp: { host: '127.0.0.1', port: 9000, entity_port: 9000, ownship_port: 9001, enabled: false },
   entities: [],
   playing: false,
   sim_time: 0,
@@ -88,8 +88,10 @@ export function useSimulation() {
           if (
             fp === lastFp.current &&
             prev.name === data.name &&
-            prev.udp?.host === data.udp?.host &&
-            prev.udp?.port === data.udp?.port &&
+            prev.udp?.entity_port === data.udp?.entity_port &&
+            prev.udp?.ownship_port === data.udp?.ownship_port &&
+            (prev.udp?.port ?? prev.udp?.entity_port) ===
+              (data.udp?.port ?? data.udp?.entity_port) &&
             !!prev.udp?.enabled === !!data.udp?.enabled
           ) {
             if (prev.sim_time === data.sim_time) return prev
@@ -206,6 +208,10 @@ export function useSimulation() {
     },
     loadScenario: async (filename) => {
       applyState(await api.loadScenario(filename))
+      await refreshScenarios()
+    },
+    deleteScenario: async (filename) => {
+      await api.deleteScenario(filename)
       await refreshScenarios()
     },
     saveScenario: async (filename, nameOverride) => {

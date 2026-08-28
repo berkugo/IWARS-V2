@@ -150,7 +150,8 @@ void Engine::replace_scenario(Scenario sc) {
 
 void Engine::set_udp(UdpConfig cfg) {
   std::lock_guard lock(mu_);        // BU: UDP block lives on the scenario.
-  scenario_.udp = std::move(cfg);   // BU: Store host/port/enabled for snapshots and copy_scenario.
+  normalize_udp(cfg);               // BU: Force localhost; sync entity_port / legacy port.
+  scenario_.udp = std::move(cfg);   // BU: Store ports + enable for snapshots and copy_scenario.
   bump_epoch();                     // BU: UI status pill (UDP ON/OFF) needs a push.
 }
 

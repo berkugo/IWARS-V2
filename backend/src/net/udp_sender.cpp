@@ -5,9 +5,26 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <cstdint>
 #include <cstring>
+#include <vector>
 
 namespace iwars {
+namespace {
+
+bool send_to(int sock, const std::string& host, int port,
+             const std::vector<std::uint8_t>& payload) {
+  if (sock < 0 || payload.empty()) return false;
+  sockaddr_in addr{};
+  addr.sin_family = AF_INET;
+  addr.sin_port = htons(static_cast<uint16_t>(port));
+  if (::inet_pton(AF_INET, host.c_str(), &addr.sin_addr) != 1) return false;
+  const auto n = ::sendto(sock, payload.data(), payload.size(), 0,
+                          reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
+  return n == static_cast<ssize_t>(payload.size());
+}
+
+}  // namespace
 
 // BU: Default to the placeholder IWP2 encoder; socket is opened lazily on first send.
 // BU: ICD swap: replace PlaceholderEncoder with the DSS encoder class here (or call set_encoder from main).
@@ -18,7 +35,8 @@ UdpSender::~UdpSender() { close_socket(); }
 
 void UdpSender::configure(UdpConfig cfg) {
   std::lock_guard lock(mu_);  // BU: cfg_ and sock_ are shared with send().
-  cfg_ = std::move(cfg);      // BU: Store host/port/enabled.
+  normalize_udp(cfg);         // BU: Force localhost; sync legacy port with entity_port.
+  cfg_ = std::move(cfg);      // BU: Store host/ports/enabled.
   close_socket();             // BU: Drop the old fd so the next send uses a fresh socket (and new dest).
 }
 
@@ -51,18 +69,28 @@ bool UdpSender::send(const std::vector<Entity>& entities, double sim_time_s) {
   if (!encoder_) return false;                 // BU: No format installed.
   if (!ensure_socket()) return false;          // BU: Could not open a UDP socket.
 
-  const auto payload = encoder_->encode(entities, sim_time_s);  // BU: ICD lives in encode(); send() only ships the bytes.
+  UdpConfig cfg = cfg_;
+  normalize_udp(cfg);
 
-  sockaddr_in addr{};                          // BU: IPv4 destination filled below.
-  addr.sin_family = AF_INET;                   // BU: IPv4.
-  addr.sin_port = htons(static_cast<uint16_t>(cfg_.port));  // BU: Port in network byte order.
-  if (::inet_pton(AF_INET, cfg_.host.c_str(), &addr.sin_addr) != 1) {  // BU: Parse dotted-quad host.
-    return false;                              // BU: Bad host string — do not send.
+  std::vector<Entity> own;
+  std::vector<Entity> others;
+  own.reserve(1);
+  others.reserve(entities.size());
+  for (const auto& e : entities) {
+    if (is_ownship(e)) own.push_back(e);
+    else others.push_back(e);
   }
 
-  const auto n = ::sendto(sock_, payload.data(), payload.size(), 0,  // BU: Fire-and-forget datagram.
-                          reinterpret_cast<sockaddr*>(&addr), sizeof(addr));
-  return n == static_cast<ssize_t>(payload.size());  // BU: True only if the full payload was queued.
+  bool ok = true;
+  if (!own.empty()) {
+    const auto payload = encoder_->encode(own, sim_time_s);
+    ok = send_to(sock_, cfg.host, cfg.ownship_port, payload) && ok;
+  }
+  if (!others.empty()) {
+    const auto payload = encoder_->encode(others, sim_time_s);
+    ok = send_to(sock_, cfg.host, cfg.entity_port, payload) && ok;
+  }
+  return ok;
 }
 
 }  // namespace iwars

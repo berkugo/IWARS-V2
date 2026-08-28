@@ -2,22 +2,22 @@
 @import "leaflet/dist/leaflet.css";
 
 :root {
-  --bg-deep: #060a0f;
-  --bg-panel: #0b1219;
-  --bg-elevated: #111a24;
-  --bg-row: #0e1620;
-  --line: rgba(0, 229, 192, 0.12);
-  --line-strong: rgba(0, 229, 192, 0.28);
+  --bg-deep: #05080d;
+  --bg-panel: #0a1017;
+  --bg-elevated: #121b26;
+  --bg-row: #0d151e;
+  --line: rgba(0, 229, 192, 0.14);
+  --line-strong: rgba(0, 229, 192, 0.32);
   --accent: #00e5c0;
   --accent-dim: rgba(0, 229, 192, 0.12);
-  --accent-glow: rgba(0, 229, 192, 0.35);
+  --accent-glow: rgba(0, 229, 192, 0.4);
   --live: #ff3b5c;
   --friendly: #3d9eff;
   --hostile: #ff4d5e;
   --neutral: #8b9bab;
   --unknown: #ffb020;
-  --text: #e6eef6;
-  --muted: #7f91a4;
+  --text: #e8eef5;
+  --muted: #7a8c9e;
   --font-ui: system-ui, "Segoe UI", sans-serif;
   --font-display: system-ui, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
@@ -88,7 +88,6 @@ body,
   overflow: hidden;
   box-shadow: none !important;
   margin: 14px !important;
-  margin-bottom: 118px !important;
   z-index: 600 !important;
 }
 
@@ -120,20 +119,42 @@ body,
   filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.85));
 }
 
+.leaflet-marker-icon.wp-marker {
+  filter: none;
+  background: none !important;
+  border: none !important;
+}
+
+.wp-marker span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  color: #041018;
+  box-shadow: 0 0 0 1px rgba(4, 16, 24, 0.65);
+}
+
 .stitch-input {
   width: 100%;
-  border: 1px solid rgba(127, 145, 164, 0.25);
-  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(127, 145, 164, 0.22);
+  background: rgba(0, 0, 0, 0.38);
   color: var(--text);
   padding: 0.5rem 0.65rem;
   font-size: 0.75rem;
   font-family: var(--font-mono);
   outline: none;
   border-radius: 2px;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 
 .stitch-input:focus {
   border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-dim);
 }
 
 .stitch-input:disabled {
@@ -145,6 +166,7 @@ body,
 .nav-link:focus-visible,
 .btn-update:focus-visible,
 .side-tab:focus-visible,
+.editor-tab:focus-visible,
 .track-card:focus-visible {
   outline: 1px solid var(--accent);
   outline-offset: 1px;
@@ -202,6 +224,29 @@ body,
 
 .btn-update:hover {
   background: var(--accent-dim);
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.btn-ghost:hover {
+  color: var(--accent);
+  border-color: var(--line-strong);
 }
 
 .tag {
@@ -333,39 +378,137 @@ body,
   background: var(--accent-dim);
 }
 
+.editor-tabs {
+  display: flex;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-panel);
+}
+
+.editor-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.12rem;
+  min-height: 2.35rem;
+  padding: 0.4rem 0.5rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.editor-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.editor-tab:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  color: var(--muted);
+}
+
+.editor-tab-soon {
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
 .nav-link {
   border: none;
   background: transparent;
   color: var(--muted);
   font-family: var(--font-ui);
-  font-size: 0.8rem;
-  font-weight: 500;
-  padding: 0.35rem 0.15rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.4rem 0.75rem;
   cursor: pointer;
-  border-bottom: 2px solid transparent;
+  border-radius: 2px;
 }
 
 .nav-link.active {
   color: var(--accent);
-  border-bottom-color: var(--accent);
+  background: var(--accent-dim);
 }
 
 .nav-link:hover {
   color: var(--text);
 }
 
+.topbar {
+  background: linear-gradient(180deg, #0e1720 0%, var(--bg-panel) 100%);
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+
+.app-footer {
+  background: var(--bg-panel);
+  box-shadow: inset 0 1px 0 var(--line);
+}
+
+.hud-card {
+  border: 1px solid var(--line);
+  background: #0b1219;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+}
+
+.hud-chip {
+  border: 1px solid var(--line);
+  background: rgba(6, 10, 15, 0.78);
+  backdrop-filter: blur(6px);
+}
+
+.section-kicker {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.panel-rail {
+  box-shadow: inset -1px 0 0 var(--line);
+}
+
+.udp-card {
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, #101820 0%, var(--bg-panel) 40%);
+  box-shadow: 0 0 0 1px rgba(0, 229, 192, 0.04), 0 18px 40px rgba(0, 0, 0, 0.35);
+}
+
+.udp-card-bar {
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), transparent);
+}
+
 .track-card {
   width: 100%;
   text-align: left;
-  border: 1px solid transparent;
+  border: 1px solid rgba(127, 145, 164, 0.08);
   background: var(--bg-row);
-  padding: 0.7rem 0.75rem;
+  padding: 0.65rem 0.75rem;
   cursor: pointer;
   border-radius: 2px;
+  transition: border-color 0.12s ease, background 0.12s ease;
 }
 
 .track-card:hover {
-  border-color: var(--line);
+  border-color: var(--line-strong);
+  background: var(--bg-elevated);
 }
 
 .track-card.selected {
@@ -396,9 +539,10 @@ body,
   border: 1px solid var(--accent);
   background: rgba(6, 10, 15, 0.94);
   color: var(--accent);
-  padding: 0.45rem 0.9rem;
+  padding: 0.5rem 1rem;
   font-family: var(--font-mono);
   font-size: 0.7rem;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
+  box-shadow: 0 0 24px var(--accent-dim);
 }

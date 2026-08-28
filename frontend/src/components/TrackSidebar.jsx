@@ -7,6 +7,7 @@ import {
   PLATFORMS,
   altToFL,
   isOwnship,
+  nextFighterIdentity,
   ktToMps,
   mpsToKt,
 } from '../radarTypes'
@@ -91,7 +92,6 @@ export default function TrackSidebar({
 }) {
   const [draft, setDraft] = useState(null)
   const [dirty, setDirty] = useState(false)
-  const [filter, setFilter] = useState('')
   const dirtyRef = useRef(false)
   const draftRef = useRef(null)
   const flushTimer = useRef(null)
@@ -113,9 +113,27 @@ export default function TrackSidebar({
   }, [selectedId, scenarioKey])
 
   useEffect(() => {
-    if (!selectedId || dirtyRef.current) return
-    if (Date.now() < skipSyncUntil.current) return
+    if (!selectedId) return
     const e = entities.find((x) => x.id === selectedId) || null
+    if (!e) {
+      setDraft(null)
+      return
+    }
+    if (dirtyRef.current || Date.now() < skipSyncUntil.current) {
+      setDraft((prev) => {
+        if (!prev || prev.id !== e.id) return cloneEntity(e)
+        const er = e.route || []
+        const pr = prev.route || []
+        if (
+          er.length === pr.length &&
+          er.every((w, i) => w.lat === pr[i]?.lat && w.lon === pr[i]?.lon)
+        ) {
+          return prev
+        }
+        return { ...prev, route: [...er], route_index: e.route_index ?? 0 }
+      })
+      return
+    }
     setDraft(cloneEntity(e))
   }, [entities, selectedId])
 
@@ -172,10 +190,16 @@ export default function TrackSidebar({
           next.speed_mps = p.speed
           next.alt_m = p.alt
         }
-      }
-      if (field === 'heading_deg') {
-        next.route = []
-        next.route_index = 0
+        if (value === 'fighter') {
+          const compact = String(next.name || '')
+            .toUpperCase()
+            .replace(/[-\s]/g, '')
+          if (!/^FIGHTER\d+$/.test(compact)) {
+            next.name = nextFighterIdentity(
+              entities.filter((e) => e.id !== next.id),
+            ).name
+          }
+        }
       }
       draftRef.current = next
       nextEntity = next
@@ -201,22 +225,11 @@ export default function TrackSidebar({
     return e.affiliation || e.side || 'unknown'
   }
 
-  const q = filter.trim().toLowerCase()
-  const visible = q
-    ? entities.filter((e) => {
-        const blob = `${e.name || ''} ${e.id} ${e.platform || ''} ${e.affiliation || ''}`.toLowerCase()
-        return blob.includes(q)
-      })
-    : entities
-
   return (
-    <aside className="flex h-full w-[300px] shrink-0 flex-col border-r border-[var(--line)] bg-[var(--bg-panel)]">
+    <aside className="panel-rail flex h-full w-[300px] shrink-0 flex-col overflow-hidden bg-[var(--bg-panel)]">
       <div className="border-b border-[var(--line)] px-3 py-3">
         <div className="flex items-baseline justify-between gap-2">
-          <div
-            className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]"
-            style={{ fontFamily: 'var(--font-display)' }}
-          >
+          <div className="section-kicker">
             {editorMode ? 'Tracks in scenario' : 'Live tracks'}
           </div>
           <div className="text-[10px] text-[var(--muted)]" style={{ fontFamily: 'var(--font-mono)' }}>
@@ -228,25 +241,17 @@ export default function TrackSidebar({
             ? 'Place Track / Place Waypoint, or keys 1 2 3.'
             : 'Read-only. Space plays or pauses.'}
         </p>
-        <input
-          className="stitch-input mt-2"
-          placeholder="Filter callsign…"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
       </div>
 
       <ul className="max-h-[38%] space-y-1.5 overflow-y-auto p-2">
-        {visible.length === 0 && (
+        {entities.length === 0 && (
           <li className="px-2 py-8 text-center text-xs text-[var(--muted)]">
-            {entities.length === 0
-              ? editorMode
-                ? 'No air tracks — Place Track, then click the map'
-                : 'No air tracks in this scenario'
-              : 'No match'}
+            {editorMode
+              ? 'No air tracks — Place Track, then click the map'
+              : 'No air tracks in this scenario'}
           </li>
         )}
-        {visible.map((e) => {
+        {entities.map((e) => {
           const aff = affOf(e)
           const isSelected = e.id === selectedId
           const hostile = aff === 'hostile' || aff === 'red'
@@ -268,7 +273,10 @@ export default function TrackSidebar({
                 className={`track-card ${selClass}`}
               >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="truncate text-sm font-semibold tracking-wide">
+                      <span
+                        className="truncate text-[13px] font-semibold tracking-[0.06em]"
+                        style={{ fontFamily: 'var(--font-mono)' }}
+                      >
                         {e.name || e.id}
                       </span>
                       <span className={`tag ${own ? 'tag-ownship' : affTag(aff)}`}>
@@ -306,10 +314,7 @@ export default function TrackSidebar({
 
           <div className="flex min-h-0 flex-1 flex-col border-t border-[var(--line)]">
             <div className="border-b border-[var(--line)] px-3 py-2">
-              <div
-                className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]"
-                style={{ fontFamily: 'var(--font-display)' }}
-              >
+              <div className="section-kicker">
                 {readOnly ? 'Track Monitor' : 'Track Detail'}
               </div>
             </div>
@@ -432,12 +437,7 @@ export default function TrackSidebar({
                   </select>
                 </label>
 
-                <div
-                  className="pt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]"
-                  style={{ fontFamily: 'var(--font-display)' }}
-                >
-                  Kinematics
-                </div>
+                <div className="section-kicker pt-1">Kinematics</div>
                 <div className="grid grid-cols-2 gap-2">
                   {[
                     ['lat', 'Lat', draft.lat],
@@ -486,15 +486,10 @@ export default function TrackSidebar({
 
                 {editorMode && (
                   <>
-                    <div
-                      className="pt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]"
-                      style={{ fontFamily: 'var(--font-display)' }}
-                    >
-                      Route waypoints
-                    </div>
+                    <div className="section-kicker pt-1">Route waypoints</div>
                     {(draft.route || []).length === 0 ? (
                       <p className="text-[10px] leading-relaxed text-[var(--muted)]">
-                        No waypoints. Use Place Waypoint and click the map.
+                        No waypoints. Place Waypoint, then click the map. Double-click to finish.
                       </p>
                     ) : (
                       <ul className="max-h-28 space-y-1 overflow-y-auto">
@@ -544,12 +539,7 @@ export default function TrackSidebar({
                   </>
                 )}
 
-                <div
-                  className="pt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted)]"
-                  style={{ fontFamily: 'var(--font-display)' }}
-                >
-                  IFF / SIF
-                </div>
+                <div className="section-kicker pt-1">IFF / SIF</div>
                 <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
                   <input
                     type="checkbox"

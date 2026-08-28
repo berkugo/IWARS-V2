@@ -150,9 +150,6 @@ export function buildOwnshipIconSvg(selected, heading) {
   const glow = selected ? '#fbbf24' : c
   const h = Number(heading) || 0
   return `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-    <circle cx="32" cy="32" r="28" fill="none" stroke="${c}" stroke-width="1" opacity="0.2" stroke-dasharray="2 4"/>
-    <circle cx="32" cy="32" r="21" fill="none" stroke="${c}" stroke-width="1.2" opacity="0.4"/>
-    <path d="M32 11 A21 21 0 0 1 53 32" fill="none" stroke="${c}" stroke-width="2.2" opacity="0.55" stroke-linecap="round"/>
     ${selected ? `<circle cx="32" cy="32" r="30" fill="none" stroke="${glow}" stroke-width="1.8" opacity="0.85"/>` : ''}
     <g transform="translate(8 8) rotate(${h} 24 24)">
       ${silhouetteAew(c)}

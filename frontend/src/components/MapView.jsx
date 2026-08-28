@@ -91,15 +91,75 @@ function MapSync({ center, zoom, scenarioKey }) {
   return null
 }
 
-function MapClick({ onMapClick }) {
-  const cb = useRef(onMapClick)
-  cb.current = onMapClick
+function MapClick({ onMapClick, onFinishRoute, placeWaypoints }) {
+  const clickCb = useRef(onMapClick)
+  const finishCb = useRef(onFinishRoute)
+  clickCb.current = onMapClick
+  finishCb.current = onFinishRoute
+  const map = useMap()
+
+  useEffect(() => {
+    if (placeWaypoints) map.doubleClickZoom.disable()
+    else map.doubleClickZoom.enable()
+    return () => map.doubleClickZoom.enable()
+  }, [map, placeWaypoints])
+
   useMapEvents({
     click(e) {
-      cb.current?.(e.latlng.lat, e.latlng.lng)
+      clickCb.current?.(e.latlng.lat, e.latlng.lng)
+    },
+    dblclick(e) {
+      if (!placeWaypoints) return
+      L.DomEvent.stop(e)
+      finishCb.current?.()
     },
   })
   return null
+}
+
+function RouteGhost({ selected, tool }) {
+  const [cursor, setCursor] = useState(null)
+  const placing = tool === 'add_waypoint' && !!selected
+
+  useMapEvents({
+    mousemove(e) {
+      if (placing) setCursor(e.latlng)
+    },
+    mouseout() {
+      setCursor(null)
+    },
+  })
+
+  if (!placing || !cursor) return null
+  const route = selected.route || []
+  const last = route.length
+    ? route[route.length - 1]
+    : { lat: selected.lat, lon: selected.lon }
+  const color = isOwnship(selected) ? '#7af5dc' : AFF_COLOR[selected.affiliation || selected.side] || AFF_COLOR.unknown
+  return (
+    <Polyline
+      positions={[
+        [last.lat, last.lon],
+        [cursor.lat, cursor.lng],
+      ]}
+      interactive={false}
+      pathOptions={{
+        color,
+        weight: 1.5,
+        opacity: 0.55,
+        dashArray: '2 6',
+      }}
+    />
+  )
+}
+
+function waypointIcon(n, color) {
+  return L.divIcon({
+    className: 'wp-marker',
+    html: `<span style="background:${color}">${n}</span>`,
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+  })
 }
 
 function CountryBorders() {
@@ -124,12 +184,15 @@ const EntityLayer = memo(function EntityLayer({
   entity: e,
   selected,
   readOnly,
+  tool,
   onSelect,
+  onMapClick,
   onDragEntity,
 }) {
   const aff = e.affiliation || e.side || 'unknown'
   const own = isOwnship(e)
   const color = own ? '#7af5dc' : AFF_COLOR[aff] || AFF_COLOR.unknown
+  const placingWp = tool === 'add_waypoint'
   const route = useMemo(
     () => (e.route || []).map((w) => [w.lat, w.lon]),
     [e.route],
@@ -145,55 +208,86 @@ const EntityLayer = memo(function EntityLayer({
 
   const handlers = useMemo(
     () => ({
-      click: () => onSelect?.(e.id),
+      click: (ev) => {
+        if (placingWp) {
+          L.DomEvent.stopPropagation(ev.originalEvent)
+          if (!selected) {
+            onSelect?.(e.id)
+            return
+          }
+          const map = ev.target._map
+          if (map && onMapClick) {
+            const ll = map.mouseEventToLatLng(ev.originalEvent)
+            onMapClick(ll.lat, ll.lng)
+          }
+          return
+        }
+        if (tool === 'add_track') return
+        onSelect?.(e.id)
+      },
       dragend: (ev) => {
         if (readOnly) return
         const { lat, lng } = ev.target.getLatLng()
         onDragEntity?.(e.id, lat, lng)
       },
     }),
-    [e.id, onSelect, onDragEntity, readOnly],
+    [e.id, onSelect, onDragEntity, onMapClick, readOnly, placingWp, tool, selected],
   )
 
   const linePositions = useMemo(() => {
     if (route.length === 0) return null
-    if (route.length === 1) return [[e.lat, e.lon], route[0]]
-    return route
+    return [[e.lat, e.lon], ...route]
   }, [route, e.lat, e.lon])
+
+  const wpIcons = useMemo(
+    () => route.map((_, i) => waypointIcon(i + 1, color)),
+    [route.length, color],
+  )
 
   return (
     <Fragment>
       {linePositions && (
-        <>
-          <Polyline
-            positions={linePositions}
+        <Polyline
+          positions={linePositions}
+          interactive={false}
+          pathOptions={{
+            color,
+            weight: selected ? 2.5 : 1.5,
+            opacity: selected ? 0.9 : 0.4,
+            dashArray: selected ? '6 8' : '4 8',
+          }}
+        />
+      )}
+      {route.map((pos, i) =>
+        selected ? (
+          <Marker
+            key={`${e.id}-wp-${i}`}
+            position={pos}
+            icon={wpIcons[i]}
+            interactive={false}
+            keyboard={false}
+            zIndexOffset={-200}
+          />
+        ) : (
+          <CircleMarker
+            key={`${e.id}-wp-${i}`}
+            center={pos}
+            radius={3}
+            interactive={false}
             pathOptions={{
               color,
-              weight: selected ? 2.5 : 1.5,
-              opacity: selected ? 0.85 : 0.45,
-              dashArray: '4 8',
+              fillColor: color,
+              fillOpacity: 0.65,
+              weight: 1,
+              opacity: 0.7,
             }}
           />
-          {route.map((pos, i) => (
-            <CircleMarker
-              key={`${e.id}-wp-${i}`}
-              center={pos}
-              radius={3}
-              pathOptions={{
-                color,
-                fillColor: color,
-                fillOpacity: 0.7,
-                weight: 1,
-                opacity: 0.8,
-              }}
-            />
-          ))}
-        </>
+        ),
       )}
       <Marker
         position={[e.lat, e.lon]}
         icon={icon}
-        draggable={!readOnly}
+        draggable={!readOnly && !placingWp}
         eventHandlers={handlers}
       />
     </Fragment>
@@ -208,13 +302,19 @@ function MapView({
   scenarioKey,
   readOnly = false,
   cursor = 'default',
+  tool = 'select',
   onSelect,
   onMapClick,
+  onFinishRoute,
   onDragEntity,
 }) {
   const mapCenter = useMemo(
-    () => [center?.[0] ?? 39.9334, center?.[1] ?? 32.8597],
+    () => [center?.[0] ?? 38.9637, center?.[1] ?? 35.2433],
     [center],
+  )
+  const selected = useMemo(
+    () => entities.find((e) => e.id === selectedId) || null,
+    [entities, selectedId],
   )
 
   return (
@@ -227,17 +327,28 @@ function MapView({
       zoomControl={false}
       preferCanvas
     >
-      <ZoomControl position="bottomright" />
+      <ZoomControl position="bottomleft" />
       <CountryBorders />
       <MapSync center={mapCenter} zoom={zoom} scenarioKey={scenarioKey} />
-      {!readOnly && <MapClick onMapClick={onMapClick} />}
+      {!readOnly && (
+        <MapClick
+          onMapClick={onMapClick}
+          onFinishRoute={onFinishRoute}
+          placeWaypoints={tool === 'add_waypoint'}
+        />
+      )}
+      {!readOnly && tool === 'add_waypoint' && (
+        <RouteGhost selected={selected} tool={tool} />
+      )}
       {entities.map((e) => (
         <EntityLayer
           key={e.id}
           entity={e}
           selected={e.id === selectedId}
           readOnly={readOnly}
+          tool={tool}
           onSelect={onSelect}
+          onMapClick={onMapClick}
           onDragEntity={onDragEntity}
         />
       ))}

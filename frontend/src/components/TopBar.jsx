@@ -1,3 +1,6 @@
+import { normalizeUdp } from './UdpConfigPage'
+import { altToFL, mpsToKt } from '../radarTypes'
+
 const NAV = [
   { id: 'simulation', label: 'Simulation' },
   { id: 'editor', label: 'Scenario Editor' },
@@ -38,23 +41,41 @@ export default function TopBar({
   onPlay,
   onPause,
   onReset,
+  selected,
 }) {
-  const udp = state.udp || { host: '127.0.0.1', port: 9000, enabled: false }
+  const udp = normalizeUdp(state.udp)
   const t = Number(state.sim_time || 0).toFixed(1)
   const playing = !!state.playing
+  const own = !!(selected && (selected.ownship || selected.id === 'ownship'))
+  const role = selected
+    ? own
+      ? 'OWNSHIP'
+      : (selected.platform || 'track').toUpperCase()
+    : null
+  const kt = selected ? Math.round(mpsToKt(selected.speed_mps)) : null
+  const fl = selected ? altToFL(selected.alt_m ?? selected.alt) : null
+  const hdg = selected
+    ? String(Math.round(Number(selected.heading_deg) || 0)).padStart(3, '0')
+    : null
+  const iff = selected?.iff_enabled
+    ? `${selected.iff_mode || '3A'} ${selected.squawk || '----'}`
+    : null
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-4 border-b border-[var(--line)] bg-[var(--bg-panel)] px-4">
-      <div className="flex shrink-0 items-center gap-2">
+    <header className="topbar flex h-12 shrink-0 items-center gap-4 px-4">
+      <div className="flex shrink-0 items-center">
         <span
-          className="text-lg font-bold tracking-[0.06em] text-[var(--accent)]"
+          className="text-[15px] font-bold tracking-[0.12em] text-[var(--accent)]"
           style={{ fontFamily: 'var(--font-display)' }}
         >
-          IWARS v2
+          IWARS
+          <span className="ml-1 text-[10px] font-semibold tracking-[0.18em] text-[var(--muted)]">
+            v2
+          </span>
         </span>
       </div>
 
-      <nav className="ml-4 flex items-center gap-5">
+      <nav className="ml-2 flex items-center gap-1">
         {NAV.map((item) => (
           <button
             key={item.id}
@@ -78,7 +99,7 @@ export default function TopBar({
           <span className="text-[var(--muted)]">
             UDP{' '}
             <span className="text-[var(--text)]">
-              {udp.host}:{udp.port}
+              {udp.entity_port ?? udp.port ?? 9000}/{udp.ownship_port ?? 9001}
             </span>{' '}
             <span className={udp.enabled ? 'text-[var(--accent)]' : ''}>
               {udp.enabled ? 'ON' : 'OFF'}
@@ -100,18 +121,38 @@ export default function TopBar({
             <button type="button" className="icon-btn" title="Reset to scenario start" onClick={onReset}>
               <IconReset />
             </button>
-            <span
-              className={`hidden text-[10px] font-semibold uppercase tracking-wider sm:inline ${
-                playing ? 'text-[var(--accent)]' : 'text-[var(--muted)]'
-              }`}
-              style={{ fontFamily: 'var(--font-mono)' }}
-            >
-              {playing ? 'PLAYING' : 'PAUSED'}
-            </span>
           </>
         )}
 
-        <div className="ml-1 flex items-center gap-2">
+        <div className="ml-1 flex shrink-0 items-center gap-2">
+          {selected ? (
+            <div
+              className="hidden items-baseline gap-2 border-l border-[var(--line)] pl-3 sm:flex"
+              style={{ fontFamily: 'var(--font-mono)' }}
+              title={`${selected.name || selected.id} ${role}`}
+            >
+              <span className="max-w-[7rem] truncate text-[12px] font-semibold tracking-wide text-[var(--text)]">
+                {selected.name || selected.id}
+              </span>
+              <span className="text-[10px] tracking-wider text-[var(--muted)]">{role}</span>
+              <span className="text-[10px] text-[var(--muted)]">
+                <span className="text-[var(--text)]">{kt}</span> kt
+              </span>
+              <span className="text-[10px] text-[var(--muted)]">
+                FL<span className="text-[var(--text)]">{String(fl).padStart(3, '0')}</span>
+              </span>
+              <span className="text-[10px] text-[var(--muted)]">
+                <span className="text-[var(--text)]">{hdg}</span>°
+              </span>
+              {iff ? (
+                <span className="text-[10px] text-[var(--muted)]">
+                  IFF <span className="text-[var(--text)]">{iff}</span>
+                </span>
+              ) : (
+                <span className="text-[10px] text-[var(--muted)]">IFF OFF</span>
+              )}
+            </div>
+          ) : null}
           <span
             className={`h-2.5 w-2.5 shrink-0 rounded-full ${
               connected ? 'bg-emerald-500' : 'bg-red-500'
@@ -124,14 +165,6 @@ export default function TopBar({
               style={{ fontFamily: 'var(--font-mono)' }}
             >
               T+{t}s
-            </span>
-          )}
-          {nav === 'editor' && (
-            <span
-              className="text-xs uppercase tracking-wider text-[var(--accent)]"
-              style={{ fontFamily: 'var(--font-mono)' }}
-            >
-              Edit
             </span>
           )}
         </div>

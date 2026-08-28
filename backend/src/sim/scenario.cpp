@@ -11,8 +11,7 @@ nlohmann::json Scenario::to_json() const {
       {"center_lat", meta.center_lat},                           // BU: Map camera latitude.
       {"center_lon", meta.center_lon},                           // BU: Map camera longitude.
       {"zoom", meta.zoom},                                       // BU: Leaflet zoom.
-      {"udp",                                                    // BU: Nested UDP destination block.
-       {{"host", udp.host}, {"port", udp.port}, {"enabled", udp.enabled}}},
+      {"udp", udp_to_json(udp)},
       {"entities", entities},                                    // BU: Array of Entity (uses to_json ADL).
   };
 }
@@ -20,14 +19,11 @@ nlohmann::json Scenario::to_json() const {
 void Scenario::from_json(const nlohmann::json& j) {
   meta.name = j.value("name", std::string{"untitled"});          // BU: Name, or "untitled".
   meta.description = j.value("description", std::string{});      // BU: Description, or empty.
-  meta.center_lat = j.value("center_lat", 39.9334);              // BU: Camera lat, default Ankara.
-  meta.center_lon = j.value("center_lon", 32.8597);              // BU: Camera lon, default Ankara.
-  meta.zoom = j.value("zoom", 10);                               // BU: Zoom default 10.
+  meta.center_lat = j.value("center_lat", 38.9637);              // BU: Camera lat, default Turkey overview.
+  meta.center_lon = j.value("center_lon", 35.2433);              // BU: Camera lon, default Turkey overview.
+  meta.zoom = j.value("zoom", 6);                                // BU: Zoom default 6 (whole Turkey).
   if (j.contains("udp") && j["udp"].is_object()) {               // BU: Optional UDP object.
-    const auto& u = j["udp"];                                    // BU: Nested object.
-    udp.host = u.value("host", std::string{"127.0.0.1"});        // BU: Destination IPv4.
-    udp.port = u.value("port", 9000);                            // BU: Destination port.
-    udp.enabled = u.value("enabled", false);                     // BU: Send flag; default off.
+    udp = udp_from_json(j["udp"]);                               // BU: Localhost + entity/ownship ports.
   }
   entities = j.value("entities", std::vector<Entity>{});         // BU: Track list, or empty.
   ensure_ownship();                                              // BU: Always finish with AEWC737 at index 0.
@@ -52,7 +48,7 @@ void Scenario::ensure_ownship() {
   if (found) {                                                   // BU: File had an ownship — lock identity, keep pose.
     normalize_ownship(kept);                                     // BU: Lock AEWC737 identity; keep pose/speed/route.
   } else {
-    kept = make_ownship(meta.center_lat, meta.center_lon);       // BU: Synthesize ownship at the map center.
+    kept = make_ownship();                                       // BU: Synthesize AEWC737 at Ankara; camera may be Turkey-wide.
   }
   filtered.insert(filtered.begin(), std::move(kept));            // BU: Ownship is always the first entity.
   entities = std::move(filtered);                                // BU: Replace the list.

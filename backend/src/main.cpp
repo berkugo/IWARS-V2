@@ -108,12 +108,9 @@ int main(int argc, char** argv) {
       engine.replace_scenario(sc);                                  // BU: Install the legacy picture.
       udp.configure(sc.udp);                                        // BU: Apply its UDP block.
       std::cout << "[main] loaded " << legacy << "\n";              // BU: Confirm legacy load.
-    } else {                                                        // BU: No demo file — start empty over Ankara.
-      iwars::Scenario empty;                                        // BU: Default-constructed scenario (Ankara camera).
+    } else {                                                        // BU: No demo file — start empty, Turkey-wide camera.
+      iwars::Scenario empty;                                        // BU: Defaults: Turkey center, zoom 6, ownship at Ankara.
       empty.meta.name = "blank";                                    // BU: Label it blank in the UI.
-      empty.meta.center_lat = 39.9334;                              // BU: Ankara latitude.
-      empty.meta.center_lon = 32.8597;                              // BU: Ankara longitude.
-      empty.meta.zoom = 11;                                         // BU: Slightly closer than the struct default.
       engine.replace_scenario(empty);                               // BU: Ownship is injected inside replace_scenario.
     }
   }
@@ -130,7 +127,7 @@ int main(int argc, char** argv) {
       sim_time = state.value("sim_time", sim_time);                            // BU: Latch the clock carried in the snapshot.
       auto sc = engine.copy_scenario();                                        // BU: Copy entities + udp.enabled under the engine lock.
       if (sc.udp.enabled) {                                                    // BU: Respect the scenario/UI enable flag.
-        udp.send(sc.entities, sim_time);                                       // BU: ICD: encoder_ packs Entity[] ; change send() if DSS wants one packet per track.
+        udp.send(sc.entities, sim_time);                                       // BU: Two localhost datagrams: entity_port + ownship_port.
       }
     }
   });

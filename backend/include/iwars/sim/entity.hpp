@@ -63,7 +63,7 @@ inline bool is_ownship(const Entity& e) {
 
 /** B737 AEW&C ownship — always present; kinematics are operator-editable. */
 // BU: Factory for a default AEWC737 sitting at the given map center, FL312, heading east.
-inline Entity make_ownship(double lat, double lon) {
+inline Entity make_ownship(double lat = 39.9334, double lon = 32.8597) {
   Entity e;                         // BU: Start from default-constructed zeros / defaults.
   e.id = kOwnshipId;                // BU: Force the canonical ownship id.
   e.name = kOwnshipCallsign;        // BU: Force the AEWC737 callsign.
@@ -73,7 +73,7 @@ inline Entity make_ownship(double lat, double lon) {
   e.lon = lon;                      // BU: Place it at the requested longitude.
   e.alt_m = 9500;                   // BU: Default cruise altitude ~FL312.
   e.heading_deg = 90;               // BU: Default heading east.
-  e.speed_mps = 0;                  // BU: Default parked; operator may later set a cruise speed.
+  e.speed_mps = 230;                // BU: B737 typical cruise ~447 kt TAS.
   e.iff_enabled = true;             // BU: Ownship replies to IFF.
   e.iff_mode = "3A";                // BU: Default Mode 3/A.
   e.squawk = "0001";                // BU: Distinct ownship squawk.

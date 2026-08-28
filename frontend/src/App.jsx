@@ -4,20 +4,9 @@ import TopBar from './components/TopBar'
 import TrackSidebar from './components/TrackSidebar'
 import MapChrome from './components/MapChrome'
 import UdpConfigPage from './components/UdpConfigPage'
-import ScenarioEditorPanel from './components/ScenarioEditorPanel'
+import ScenarioEditorPanel, { EditorDomainTabs } from './components/ScenarioEditorPanel'
 import { useSimulation } from './hooks/useSimulation'
-import { defaultEntity, makeOwnship } from './radarTypes'
-
-function newEntityId(entities) {
-  let n = entities.length + 1
-  let id = `tgt-${n}`
-  const ids = new Set(entities.map((e) => e.id))
-  while (ids.has(id)) {
-    n += 1
-    id = `tgt-${n}`
-  }
-  return id
-}
+import { defaultEntity, makeOwnship, nextFighterIdentity, ANKARA, TURKEY_VIEW } from './radarTypes'
 
 export default function App() {
   const sim = useSimulation()
@@ -28,6 +17,9 @@ export default function App() {
   const [tool, setTool] = useState('select')
   const [toast, setToast] = useState(null)
   const toastTimer = useRef(null)
+  const lastWpClick = useRef({ t: 0, lat: 0, lon: 0 })
+  const pendingRoutes = useRef(new Map())
+  const [routeTick, setRouteTick] = useState(0)
 
   const flash = useCallback((msg) => {
     setToast(msg)
@@ -35,7 +27,24 @@ export default function App() {
     toastTimer.current = setTimeout(() => setToast(null), 2200)
   }, [])
 
-  const entities = sim.state.entities || []
+  const setPendingRoute = useCallback((id, route) => {
+    pendingRoutes.current.set(id, Array.isArray(route) ? route : [])
+    setRouteTick((n) => n + 1)
+  }, [])
+
+  const entities = useMemo(() => {
+    const list = sim.state.entities || []
+    if (pendingRoutes.current.size === 0) return list
+    return list.map((e) => {
+      if (!pendingRoutes.current.has(e.id)) return e
+      return {
+        ...e,
+        route: pendingRoutes.current.get(e.id),
+        route_index: 0,
+      }
+    })
+  }, [sim.state.entities, routeTick])
+
   const selected = entities.find((e) => e.id === selectedId)
   const isEditor = nav === 'editor'
 
@@ -49,7 +58,35 @@ export default function App() {
     if (sim.state.name) setScenarioName(sim.state.name)
   }, [sim.state.name])
 
-  // Pause playback while authoring
+  useEffect(() => {
+    lastWpClick.current = { t: 0, lat: 0, lon: 0 }
+  }, [tool, selectedId])
+
+  useEffect(() => {
+    const server = sim.state.entities || []
+    let changed = false
+    for (const [id, route] of [...pendingRoutes.current.entries()]) {
+      const e = server.find((x) => x.id === id)
+      if (!e) {
+        pendingRoutes.current.delete(id)
+        changed = true
+        continue
+      }
+      const sr = e.route || []
+      if (
+        sr.length === route.length &&
+        sr.every(
+          (w, i) =>
+            Math.abs(w.lat - route[i].lat) < 1e-7 &&
+            Math.abs(w.lon - route[i].lon) < 1e-7,
+        )
+      ) {
+        pendingRoutes.current.delete(id)
+        changed = true
+      }
+    }
+    if (changed) setRouteTick((n) => n + 1)
+  }, [sim.state.entities])
   useEffect(() => {
     if (isEditor && sim.state.playing) {
       sim.pause()
@@ -60,23 +97,37 @@ export default function App() {
   const handleMapClick = useCallback(
     async (lat, lon) => {
       if (isEditor && tool === 'add_track') {
-        const id = newEntityId(entities)
-        await sim.addEntity(defaultEntity(id, lat, lon))
+        const { id, name } = nextFighterIdentity(entities)
+        await sim.addEntity(defaultEntity(id, lat, lon, name))
         setSelectedId(id)
         setTool('select')
+        flash(name)
         return
       }
       if (isEditor && tool === 'add_waypoint') {
-        if (!selectedId) return
+        if (!selectedId) {
+          flash('Select a track first')
+          return
+        }
         const e = entities.find((x) => x.id === selectedId)
         if (!e) return
+        const last = lastWpClick.current
+        const dt = Date.now() - last.t
+        const distM =
+          Math.sqrt((lat - last.lat) ** 2 + (lon - last.lon) ** 2) * 111320
+        if (last.t && dt < 400 && distM < 800) {
+          setTool('select')
+          return
+        }
+        lastWpClick.current = { t: Date.now(), lat, lon }
         const route = [...(e.route || []), { lat, lon }]
+        setPendingRoute(selectedId, route)
         await sim.updateEntity(selectedId, { ...e, route, route_index: 0 })
         return
       }
       // Simulation: optional quick-add via tool not used; ignore
     },
-    [isEditor, tool, entities, sim, selectedId],
+    [isEditor, tool, entities, sim, selectedId, flash, setPendingRoute],
   )
 
   const handleDrag = useCallback(
@@ -108,9 +159,10 @@ export default function App() {
     async (id) => {
       const e = entities.find((x) => x.id === id)
       if (!e) return
+      setPendingRoute(id, [])
       await sim.updateEntity(id, { ...e, route: [], route_index: 0 })
     },
-    [entities, sim],
+    [entities, sim, setPendingRoute],
   )
 
   const handleRemoveWaypoint = useCallback(
@@ -118,9 +170,10 @@ export default function App() {
       const e = entities.find((x) => x.id === id)
       if (!e) return
       const route = (e.route || []).filter((_, i) => i !== index)
+      setPendingRoute(id, route)
       await sim.updateEntity(id, { ...e, route, route_index: 0 })
     },
-    [entities, sim],
+    [entities, sim, setPendingRoute],
   )
 
   const handleSave = useCallback(async () => {
@@ -136,16 +189,20 @@ export default function App() {
   const handleNew = useCallback(async () => {
     if (!window.confirm('Start a blank scenario? Unsaved map edits will be lost.')) return
     await sim.pause()
-    const centerLat = 39.9334
-    const centerLon = 32.8597
     await sim.replaceScenario({
       name: 'untitled',
       description: '',
-      center_lat: centerLat,
-      center_lon: centerLon,
-      zoom: 6,
-      udp: sim.state.udp || { host: '127.0.0.1', port: 9000, enabled: false },
-      entities: [makeOwnship(centerLat, centerLon)],
+      center_lat: TURKEY_VIEW.lat,
+      center_lon: TURKEY_VIEW.lon,
+      zoom: TURKEY_VIEW.zoom,
+      udp: sim.state.udp || {
+        host: '127.0.0.1',
+        port: 9000,
+        entity_port: 9000,
+        ownship_port: 9001,
+        enabled: false,
+      },
+      entities: [makeOwnship(ANKARA.lat, ANKARA.lon)],
     })
     setSelectedId('ownship')
     setScenarioName('untitled')
@@ -160,6 +217,18 @@ export default function App() {
       setSaveName(filename)
       setTool('select')
       flash(`Loaded ${filename}`)
+    },
+    [sim, flash],
+  )
+
+  const handleDeleteScenario = useCallback(
+    async (filename) => {
+      try {
+        await sim.deleteScenario(filename)
+        flash(`Deleted ${filename}`)
+      } catch (e) {
+        flash(e.message || `Could not delete ${filename}`)
+      }
     },
     [sim, flash],
   )
@@ -217,6 +286,7 @@ export default function App() {
         onPlay={sim.play}
         onPause={sim.pause}
         onReset={sim.reset}
+        selected={selected}
       />
 
       {sim.error && (
@@ -237,35 +307,54 @@ export default function App() {
       {(nav === 'simulation' || nav === 'editor') && (
         <div className="flex min-h-0 flex-1">
           {isEditor ? (
-            <ScenarioEditorPanel
-              state={sim.state}
-              scenarios={sim.scenarios}
-              saveName={saveName}
-              setSaveName={setSaveName}
-              scenarioName={scenarioName}
-              setScenarioName={setScenarioName}
-              tool={tool}
-              setTool={setTool}
-              onLoad={handleLoad}
-              onSave={handleSave}
-              onNew={handleNew}
+            <div className="flex h-full min-h-0 shrink-0 flex-col">
+              <EditorDomainTabs tab="track" />
+              <div className="flex min-h-0 flex-1">
+                <ScenarioEditorPanel
+                  state={sim.state}
+                  scenarios={sim.scenarios}
+                  saveName={saveName}
+                  setSaveName={setSaveName}
+                  scenarioName={scenarioName}
+                  setScenarioName={setScenarioName}
+                  tool={tool}
+                  setTool={setTool}
+                  onLoad={handleLoad}
+                  onSave={handleSave}
+                  onNew={handleNew}
+                  onDelete={handleDeleteScenario}
+                />
+
+                <TrackSidebar
+                  entities={entities}
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                  onChange={handleChange}
+                  onDelete={handleDelete}
+                  editorMode
+                  readOnly={false}
+                  onClearRoute={handleClearRoute}
+                  onRemoveWaypoint={handleRemoveWaypoint}
+                  scenarioKey={scenarioKey}
+                />
+              </div>
+            </div>
+          ) : (
+            <TrackSidebar
+              entities={entities}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onChange={handleChange}
+              onDelete={handleDelete}
+              editorMode={false}
+              readOnly
+              onClearRoute={handleClearRoute}
+              onRemoveWaypoint={handleRemoveWaypoint}
+              scenarioKey={scenarioKey}
             />
-          ) : null}
+          )}
 
-          <TrackSidebar
-            entities={entities}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onChange={handleChange}
-            onDelete={handleDelete}
-            editorMode={isEditor}
-            readOnly={!isEditor}
-            onClearRoute={handleClearRoute}
-            onRemoveWaypoint={handleRemoveWaypoint}
-            scenarioKey={scenarioKey}
-          />
-
-          <main className="relative min-w-0 flex-1">
+          <main className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
             <MapView
               entities={entities}
               center={[sim.state.center_lat, sim.state.center_lon]}
@@ -278,17 +367,17 @@ export default function App() {
                   ? 'place'
                   : 'default'
               }
+              tool={isEditor ? tool : 'select'}
               onSelect={(id) => {
                 setSelectedId(id)
                 if (isEditor && tool === 'add_track') setTool('select')
               }}
               onMapClick={isEditor ? handleMapClick : undefined}
+              onFinishRoute={isEditor ? () => setTool('select') : undefined}
               onDragEntity={isEditor ? handleDrag : undefined}
             />
             <MapChrome
-              state={sim.state}
               selected={selected}
-              connected={sim.connected}
               mode={isEditor ? 'editor' : 'simulation'}
               tool={isEditor ? tool : 'select'}
             />
@@ -298,7 +387,7 @@ export default function App() {
 
       {toast && <div className="app-toast">{toast}</div>}
 
-      <footer className="flex h-8 shrink-0 items-center gap-4 border-t border-[var(--line)] bg-[var(--bg-panel)] px-4 text-[10px] text-[var(--muted)]">
+      <footer className="app-footer flex h-8 shrink-0 items-center gap-4 px-4 text-[10px] text-[var(--muted)]">
         <span style={{ fontFamily: 'var(--font-mono)' }}>
           {sim.state.name || 'untitled'} · {entities.length} tracks
         </span>

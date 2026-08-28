@@ -40,6 +40,8 @@ export const api = {
   listScenarios: () => request('/scenarios'),
   loadScenario: (filename) =>
     request(`/scenarios/${encodeURIComponent(filename)}`),
+  deleteScenario: (filename) =>
+    request(`/scenarios/${encodeURIComponent(filename)}`, { method: 'DELETE' }),
   saveScenario: (filename, name) =>
     request('/scenarios', {
       method: 'POST',

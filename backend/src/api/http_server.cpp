@@ -12,12 +12,6 @@ namespace fs = std::filesystem;  // BU: Short alias for scenario directory itera
 namespace iwars {
 
 namespace {
-// BU: Small helper so PUT /api/udp can echo the stored config.
-nlohmann::json udp_to_json(const UdpConfig& c) {
-  return nlohmann::json{
-      {"host", c.host}, {"port", c.port}, {"enabled", c.enabled}};
-}
-
 std::mutex g_http_mu;                 // BU: Guards g_http_svr so stop() can call Server::stop from another thread.
 httplib::Server* g_http_svr = nullptr;  // BU: Pointer to the live httplib instance, or null when not listening.
 }  // namespace
@@ -106,11 +100,8 @@ void HttpServer::start() {
             [&](const httplib::Request& req, httplib::Response& res) {
               cors(req, res);                                          // BU: CORS.
               try {
-                auto j = nlohmann::json::parse(req.body);              // BU: Parse {host,port,enabled}.
-                UdpConfig cfg;                                         // BU: Fill with defaults then overlay JSON.
-                cfg.host = j.value("host", std::string{"127.0.0.1"});  // BU: Destination IPv4.
-                cfg.port = j.value("port", 9000);                      // BU: Destination port.
-                cfg.enabled = j.value("enabled", false);               // BU: Send enable.
+                auto j = nlohmann::json::parse(req.body);              // BU: Parse {entity_port,ownship_port,enabled}.
+                UdpConfig cfg = udp_from_json(j);                      // BU: Host forced to 127.0.0.1.
                 engine_.set_udp(cfg);                                  // BU: Store on the live scenario (snapshots include it).
                 udp_.configure(cfg);                                   // BU: Recreate the socket toward the new dest.
                 res.set_content(udp_to_json(cfg).dump(), "application/json");  // BU: Echo the applied config.
@@ -213,6 +204,35 @@ void HttpServer::start() {
               udp_.configure(sc.udp);                                  // BU: Point UDP at the file's destination.
               res.set_content(engine_.snapshot().dump(), "application/json");  // BU: Return the loaded picture.
             });
+
+    svr.Delete(R"(/api/scenarios/([^/]+))",                            // BU: Remove a *.json from scenarios_dir_.
+               [&](const httplib::Request& req, httplib::Response& res) {
+                 cors(req, res);                                       // BU: CORS.
+                 const std::string name = req.matches[1];              // BU: Filename from the URL.
+                 if (name.empty() || name.find("..") != std::string::npos ||
+                     fs::path(name).extension() != ".json") {          // BU: Only json in this folder, no traversal.
+                   res.status = 400;                                   // BU: Bad filename.
+                   res.set_content(R"({"error":"bad filename"})",
+                                   "application/json");
+                   return;                                             // BU: Do not touch disk.
+                 }
+                 const fs::path path = fs::path(scenarios_dir_) / name;  // BU: Resolve under the scenarios folder.
+                 std::error_code ec;                                   // BU: Non-throwing exists/remove.
+                 if (!fs::exists(path, ec) || !fs::is_regular_file(path, ec)) {
+                   res.status = 404;                                   // BU: Missing file.
+                   res.set_content(R"({"error":"not found"})", "application/json");
+                   return;                                             // BU: Live scenario unchanged.
+                 }
+                 if (!fs::remove(path, ec)) {                          // BU: Unlink the file.
+                   res.status = 500;                                   // BU: Disk error.
+                   res.set_content(R"({"error":"delete failed"})",
+                                   "application/json");
+                   return;                                             // BU: Tell the UI it did not persist.
+                 }
+                 res.set_content(
+                     nlohmann::json{{"filename", name}, {"ok", true}}.dump(),
+                     "application/json");                              // BU: Confirm; in-memory picture stays.
+               });
 
     svr.Post("/api/scenarios",                                         // BU: Save current (or posted) scenario to disk.
              [&](const httplib::Request& req, httplib::Response& res) {

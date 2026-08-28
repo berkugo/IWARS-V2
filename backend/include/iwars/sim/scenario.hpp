@@ -13,17 +13,48 @@ namespace iwars {
 struct ScenarioMeta {
   std::string name{"untitled"};       // BU: Scenario display name and default save stem.
   std::string description;            // BU: Free-text description shown in the editor.
-  double center_lat{39.9334};         // BU: Default map center latitude (Ankara).
-  double center_lon{32.8597};         // BU: Default map center longitude (Ankara).
-  int zoom{10};                       // BU: Default Leaflet zoom level.
+  double center_lat{38.9637};         // BU: Default map center — geographic middle of Turkey.
+  double center_lon{35.2433};         // BU: Default map center longitude (Turkey).
+  int zoom{6};                        // BU: Default Leaflet zoom — whole-country view.
 };
 
-// BU: Outbound UDP truth-feed destination and on/off switch (DSS listener address).
+// BU: Outbound UDP truth feeds (always 127.0.0.1 for now — local DSS / stim).
 struct UdpConfig {
-  std::string host{"127.0.0.1"};  // BU: IPv4 address of the workplace radar/IFF / DSS listener.
-  int port{9000};                 // BU: UDP destination port (change if DSS listens elsewhere).
+  std::string host{"127.0.0.1"};  // BU: Forced localhost; UI does not let the operator pick an IP yet.
+  int entity_port{9000};          // BU: Entity-truth datagrams (all tracks except ownship).
+  int ownship_port{9001};         // BU: Ownship-truth datagrams (AEWC737 only).
+  int port{9000};                 // BU: Legacy alias of entity_port (older scenario JSON).
   bool enabled{false};            // BU: When false, the engine still ticks but sends no datagrams.
 };
+
+// BU: Always local; keep entity_port in sync with legacy "port".
+inline void normalize_udp(UdpConfig& c) {
+  c.host = "127.0.0.1";
+  if (c.entity_port <= 0) c.entity_port = c.port > 0 ? c.port : 9000;
+  if (c.ownship_port <= 0) c.ownship_port = 9001;
+  c.port = c.entity_port;
+}
+
+inline nlohmann::json udp_to_json(const UdpConfig& c) {
+  UdpConfig n = c;
+  normalize_udp(n);
+  return nlohmann::json{
+      {"host", n.host},
+      {"port", n.entity_port},
+      {"entity_port", n.entity_port},
+      {"ownship_port", n.ownship_port},
+      {"enabled", n.enabled},
+  };
+}
+
+inline UdpConfig udp_from_json(const nlohmann::json& u) {
+  UdpConfig c;
+  c.entity_port = u.value("entity_port", u.value("port", 9000));
+  c.ownship_port = u.value("ownship_port", 9001);
+  c.enabled = u.value("enabled", false);
+  normalize_udp(c);
+  return c;
+}
 
 // BU: In-memory scenario: camera meta, UDP config, and the entity list.
 class Scenario {

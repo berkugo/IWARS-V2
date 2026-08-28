@@ -1,6 +1,10 @@
 export const OWNSHIP_ID = 'ownship'
 export const OWNSHIP_CALLSIGN = 'AEWC737'
 
+/** Map camera that frames all of Turkey (Leaflet zoom 6). */
+export const TURKEY_VIEW = { lat: 38.9637, lon: 35.2433, zoom: 6 }
+export const ANKARA = { lat: 39.9334, lon: 32.8597 }
+
 export function isOwnship(e) {
   return !!(e && (e.ownship || e.id === OWNSHIP_ID || e.name === OWNSHIP_CALLSIGN))
 }
@@ -15,7 +19,7 @@ export function makeOwnship(lat = 39.9334, lon = 32.8597) {
     lon,
     alt_m: 9500,
     heading_deg: 90,
-    speed_mps: 0,
+    speed_mps: 230,
     climb_mps: 0,
     iff_enabled: true,
     iff_mode: '3A',
@@ -41,7 +45,7 @@ export const PLATFORMS = [
   { id: 'bomber', label: 'Bomber', speed: 220, alt: 10000 },
   { id: 'transport', label: 'Transport', speed: 180, alt: 9000 },
   { id: 'tanker', label: 'Tanker', speed: 170, alt: 8500 },
-  { id: 'aew', label: 'AEW&C', speed: 160, alt: 9500 },
+  { id: 'aew', label: 'AEW&C', speed: 230, alt: 9500 },
   { id: 'isr', label: 'ISR / Recce', speed: 150, alt: 11000 },
   { id: 'uav', label: 'UAV', speed: 45, alt: 4500 },
   { id: 'ucav', label: 'UCAV', speed: 55, alt: 5000 },
@@ -70,11 +74,23 @@ export function platformOf(entity) {
   return PLATFORMS.find((p) => p.id === id) || PLATFORMS.find((p) => p.id === 'unknown')
 }
 
-export function defaultEntity(id, lat, lon) {
+/** Next unused fighter id/callsign: fighter-1 / FIGHTER1, fighter-2 / FIGHTER2, … */
+export function nextFighterIdentity(entities) {
+  const list = Array.isArray(entities) ? entities : []
+  const takenId = new Set(list.map((e) => e.id))
+  const takenName = new Set(
+    list.map((e) => String(e.name || '').toUpperCase().replace(/[-\s]/g, '')),
+  )
+  let n = 1
+  while (takenId.has(`fighter-${n}`) || takenName.has(`FIGHTER${n}`)) n += 1
+  return { id: `fighter-${n}`, name: `FIGHTER${n}` }
+}
+
+export function defaultEntity(id, lat, lon, name) {
   const p = PLATFORMS[0]
   return {
     id,
-    name: id.toUpperCase(),
+    name: name || 'FIGHTER1',
     affiliation: 'friend',
     platform: p.id,
     lat,
